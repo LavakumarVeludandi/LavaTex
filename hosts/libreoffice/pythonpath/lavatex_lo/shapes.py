@@ -142,16 +142,64 @@ def _size_hmm(result, scale=1.0):
     return w, h
 
 
+class PlacementError(Exception):
+    """LibreOffice refused the rendered picture."""
+
+    def __init__(self, summary, details=""):
+        super().__init__(summary)
+        self.summary = summary
+        self.details = details
+
+
+def _uno_message(exc):
+    return getattr(exc, "Message", "") or str(exc) or exc.__class__.__name__
+
+
+def load_graphic(ctx, path):
+    """Load a picture from its bytes (more robust than a file URL), falling
+    back to the URL, and make sure LibreOffice actually understood it."""
+    provider = _graphic_provider(ctx)
+    errors = []
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read()
+        stream = ctx.ServiceManager.createInstanceWithContext("com.sun.star.io.SequenceInputStream", ctx)
+        stream.initialize((uno.ByteSequence(data),))
+        graphic = provider.queryGraphic((_prop("InputStream", stream),))
+        if graphic is not None:
+            return graphic
+        errors.append("loading from bytes returned nothing")
+    except Exception as exc:
+        errors.append("loading from bytes: " + _uno_message(exc))
+    try:
+        graphic = provider.queryGraphic((_prop("URL", uno.systemPathToFileUrl(path)),))
+        if graphic is not None:
+            return graphic
+        errors.append("loading from file returned nothing")
+    except Exception as exc:
+        errors.append("loading from file: " + _uno_message(exc))
+    raise PlacementError("LibreOffice could not read the rendered %s picture." % os.path.splitext(path)[1][1:].upper(),
+                         "; ".join(errors))
+
+
+def _assign_graphic(shape, graphic):
+    try:
+        shape.Graphic = graphic
+    except Exception as exc:
+        raise PlacementError("LibreOffice refused the rendered picture.", _uno_message(exc))
+
+
 def place(ctx, doc, result, existing=None):
     """Insert a rendered equation, or replace the picture in ``existing``.
 
     When replacing, the user's scaling relative to the original rendered size
     is kept (not the old box size, which would distort a longer equation),
     along with the top-left position and rotation.
+
+    Raises PlacementError, leaving the slide unchanged, if LibreOffice does
+    not accept the picture.
     """
-    graphic = _graphic_provider(ctx).queryGraphic(
-        (_prop("URL", uno.systemPathToFileUrl(result["path"])),)
-    )
+    graphic = load_graphic(ctx, result["path"])
     controller = doc.getCurrentController()
     undo = None
     try:
@@ -169,7 +217,7 @@ def place(ctx, doc, result, existing=None):
                     scale = 1.0
             shape = existing
             pos = shape.Position
-            shape.Graphic = graphic
+            _assign_graphic(shape, graphic)
             w, h = _size_hmm(result, scale)
             shape.Size = Size(w, h)
             shape.Position = pos
@@ -177,7 +225,11 @@ def place(ctx, doc, result, existing=None):
             page = controller.getCurrentPage()
             shape = doc.createInstance("com.sun.star.drawing.GraphicObjectShape")
             page.add(shape)
-            shape.Graphic = graphic
+            try:
+                _assign_graphic(shape, graphic)
+            except PlacementError:
+                page.remove(shape)  # never leave an empty frame behind
+                raise
             w, h = _size_hmm(result)
             shape.Size = Size(w, h)
             shape.Position = Point(max(0, (page.Width - w) // 2), max(0, (page.Height - h) // 2))

@@ -4,6 +4,7 @@
 
 pub mod config;
 pub mod metadata;
+pub mod normalize;
 pub mod render;
 pub mod toolchain;
 

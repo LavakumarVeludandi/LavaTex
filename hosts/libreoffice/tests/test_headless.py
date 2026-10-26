@@ -143,6 +143,52 @@ def main():
                           "%s/%s: editable after reopen via %s (layers: %s; stored as %s)" % (fmt, ext, where, ", ".join(layers) or "none", mime))
                 reopened.close(True)
             doc.close(True)
+
+        # LibreOffice rejecting the vector picture: nothing half-inserted is
+        # left behind, and the app falls back to a PNG that is still editable.
+        from lavatex_lo import app
+
+        doc = desktop.loadComponentFromURL("private:factory/simpress", "_blank", 0, (prop("Hidden", True),))
+        real_assign = shapes._assign_graphic
+
+        def reject_svg(shape, graphic):
+            if graphic.MimeType == "image/svg+xml":
+                raise shapes.PlacementError("LibreOffice refused the rendered picture.", "simulated")
+            real_assign(shape, graphic)
+
+        shapes._assign_graphic = reject_svg
+        messages = []
+        real_message = app._message
+        app._message = lambda ctx_, doc_, text, kind="ERRORBOX": messages.append((kind, text))
+        try:
+            result = core.render({"source": "$x^2$", "format": "svg"})
+            before = doc.getDrawPages().getByIndex(0).getCount()
+            try:
+                shapes.place(ctx, doc, result)
+                check(False, "fallback: rejection is reported")
+            except shapes.PlacementError:
+                check(doc.getDrawPages().getByIndex(0).getCount() == before, "fallback: no empty frame left after a rejected picture")
+            app._place_with_fallback(ctx, doc, core, result, None, {"toolchain": ""})
+            eqs = find_equations(doc)
+            check(len(eqs) == 1 and eqs[0].Graphic.MimeType == "image/png", "fallback: inserted as PNG instead")
+            record, _ = shapes.read_metadata(ctx, eqs[0], core)
+            check(record is not None and record["source"] == "$x^2$", "fallback: PNG keeps the source")
+            check(messages and messages[0][0] == "WARNINGBOX" and "simulated" in messages[0][1], "fallback: user is told why")
+        finally:
+            shapes._assign_graphic = real_assign
+            app._message = real_message
+            doc.close(True)
+
+        # IguanaTeX-style input: a whole document pasted into the source box.
+        doc = desktop.loadComponentFromURL("private:factory/simpress", "_blank", 0, (prop("Hidden", True),))
+        iguana = "\\documentclass{article}\n\\usepackage{amsmath}\n\\begin{document}\n$\\displaystyle \\int_0^1 x\\,dx$\n\\end{document}"
+        result = core.render({"source": iguana, "format": "svg"})
+        check(result.get("ok"), "IguanaTeX-style full document renders")
+        if result.get("ok"):
+            s = shapes.place(ctx, doc, result)
+            check(shapes.read_metadata(ctx, s, core)[0]["source"] == iguana, "full document kept as the editable source")
+        doc.close(True)
+
     finally:
         try:
             desktop.terminate()
