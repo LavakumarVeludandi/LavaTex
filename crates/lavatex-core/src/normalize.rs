@@ -21,6 +21,8 @@ pub struct Normalized {
     /// When the preamble came from a pasted document, the source line where
     /// it starts (0-based offset), for error mapping.
     pub preamble_source_offset: Option<usize>,
+    /// The body now uses amsmath environments (aligned, gathered, ...).
+    pub needs_amsmath: bool,
 }
 
 /// Math environments that only work in vertical mode, mapped to the
@@ -51,6 +53,7 @@ pub fn normalize(source: &str, mode: Mode) -> Normalized {
         body: source.to_string(),
         body_line_offset: 0,
         preamble_source_offset: None,
+        needs_amsmath: false,
     };
 
     // 1. A complete document, IguanaTeX style.
@@ -79,13 +82,146 @@ pub fn normalize(source: &str, mode: Mode) -> Normalized {
         out.mode = Mode::Text;
     }
 
-    // 2. The body is a single math block with its own delimiters.
+    // 2. The body is a single math block with its own delimiters, or several
+    //    display blocks in a row (stacked, one per line).
     if let Some((mode, inner, skipped_lines)) = strip_math(&out.body) {
+        out.needs_amsmath |= inner.contains("\\begin{aligned")
+            || inner.contains("\\begin{gathered}")
+            || inner.contains("\\begin{alignedat}");
         out.mode = mode;
         out.body_line_offset += skipped_lines;
         out.body = inner;
+    } else if let Some(stacked) = stack_display_blocks(&out.body) {
+        out.mode = Mode::Display;
+        out.body = stacked;
+        out.needs_amsmath = true;
+    }
+
+    // 3. Line breaks: `\\` outside any environment starts a new line. In math
+    //    that needs an amsmath environment (inline math ignores `\\`): lines
+    //    are aligned at `&` if the user used `&`, centred otherwise. In text
+    //    mode a one-column table does the same.
+    let (breaks, ampersand) = top_level_breaks(&out.body);
+    if breaks {
+        out.body = match out.mode {
+            Mode::Display | Mode::Inline => {
+                out.needs_amsmath = true;
+                let env = if ampersand { "aligned" } else { "gathered" };
+                format!("\\begin{{{env}}}{}\\end{{{env}}}", out.body)
+            }
+            Mode::Text => format!(
+                "\\begin{{tabular}}{{@{{}}l@{{}}}}{}\\end{{tabular}}",
+                out.body
+            ),
+        };
     }
     out
+}
+
+/// Does `body` contain `\\` (and `&`) outside braces and environments?
+fn top_level_breaks(body: &str) -> (bool, bool) {
+    let b = body.as_bytes();
+    let (mut depth, mut envs) = (0i32, 0i32);
+    let (mut breaks, mut amp) = (false, false);
+    let mut i = 0;
+    while i < b.len() {
+        match b[i] {
+            b'%' => {
+                while i < b.len() && b[i] != b'\n' {
+                    i += 1;
+                }
+            }
+            b'{' => depth += 1,
+            b'}' => depth -= 1,
+            b'&' if depth == 0 && envs == 0 => amp = true,
+            b'\\' => {
+                let next = b.get(i + 1).copied();
+                if next == Some(b'\\') {
+                    if depth == 0 && envs == 0 {
+                        breaks = true;
+                    }
+                    i += 2;
+                    continue;
+                }
+                if next.is_some_and(|c| c.is_ascii_alphabetic()) {
+                    let start = i + 1;
+                    let mut j = start;
+                    while j < b.len() && b[j].is_ascii_alphabetic() {
+                        j += 1;
+                    }
+                    match &body[start..j] {
+                        "begin" => envs += 1,
+                        "end" => envs -= 1,
+                        _ => {}
+                    }
+                    i = j;
+                    continue;
+                }
+                i += 2; // escaped character such as \& or \{
+                continue;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    (breaks, amp)
+}
+
+/// Several display blocks in a row (`\[a\] \[b\]`, two `align*`, ...) become
+/// one `gathered` block with one row per original block. Delimiters are
+/// replaced in place so line numbers stay the same.
+fn stack_display_blocks(body: &str) -> Option<String> {
+    let mut out = String::new();
+    let mut rest = body;
+    let mut count = 0;
+    loop {
+        let skip = leading_blank_and_comment_len(rest);
+        out.push_str(&rest[..skip]);
+        rest = &rest[skip..];
+        if rest.trim().is_empty() {
+            out.push_str(rest);
+            break;
+        }
+        let sep = if count > 0 { "\\\\ " } else { "" };
+        let mut matched = false;
+        for (open, close) in [("\\[", "\\]"), ("$$", "$$")] {
+            if let Some(after) = rest.strip_prefix(open) {
+                let end = after.find(close)?;
+                out.push_str(sep);
+                out.push_str(&after[..end]);
+                rest = &after[end + close.len()..];
+                matched = true;
+                break;
+            }
+        }
+        if !matched {
+            for (env, replacement) in ENV_MAP {
+                let open = format!("\\begin{{{env}}}");
+                let close = format!("\\end{{{env}}}");
+                if let Some(after) = rest.strip_prefix(open.as_str()) {
+                    let end = after.find(&close)?;
+                    let inner = after[..end]
+                        .replace("\\nonumber", "")
+                        .replace("\\notag", "");
+                    out.push_str(sep);
+                    match replacement {
+                        None => out.push_str(&inner),
+                        Some(rep) => {
+                            out.push_str(&format!("\\begin{{{rep}}}{inner}\\end{{{rep}}}"))
+                        }
+                    }
+                    rest = &after[end + close.len()..];
+                    matched = true;
+                    break;
+                }
+            }
+        }
+        if !matched {
+            return None; // something other than display blocks
+        }
+        count += 1;
+    }
+    (count >= 2).then(|| format!("\\begin{{gathered}}{out}\\end{{gathered}}"))
 }
 
 /// Position of `cmd` outside comments.
@@ -263,6 +399,49 @@ mod tests {
         let n = normalize(doc, Mode::Display);
         assert_eq!(n.mode, Mode::Text);
         assert_eq!(n.body.trim(), "Hello $x$ world");
+    }
+
+    #[test]
+    fn double_backslash_makes_lines() {
+        let n = normalize("a = b \\\\\nc = d", Mode::Display);
+        assert_eq!(n.body, "\\begin{gathered}a = b \\\\\nc = d\\end{gathered}");
+        assert!(n.needs_amsmath);
+        let n = normalize("a &= b \\\\\n  &= c", Mode::Display);
+        assert!(n.body.starts_with("\\begin{aligned}"));
+        // Breaks inside an environment or a group are left alone.
+        let n = normalize(
+            "\\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}",
+            Mode::Display,
+        );
+        assert!(!n.body.starts_with("\\begin{gathered}"));
+        let n = normalize("\\frac{a \\\\ b}{c}", Mode::Display);
+        assert!(!n.body.starts_with("\\begin"));
+        // Text mode uses a one-column table.
+        let n = normalize("first line \\\\ second", Mode::Text);
+        assert!(n.body.starts_with("\\begin{tabular}"));
+        // A newline alone does not break the line (LaTeX semantics).
+        let n = normalize("a + b\n+ c", Mode::Display);
+        assert_eq!(n.body, "a + b\n+ c");
+    }
+
+    #[test]
+    fn stacks_several_display_blocks() {
+        let n = normalize("\\[ a = b \\]\n\\[ c = d \\]", Mode::Display);
+        assert_eq!(n.mode, Mode::Display);
+        assert_eq!(
+            n.body,
+            "\\begin{gathered} a = b \n\\\\  c = d \\end{gathered}"
+        );
+        let doc = "\\documentclass{article}\n\\begin{document}\n\\begin{align*}\na &= 1\n\\end{align*}\n\\begin{equation}\nb = 2\n\\end{equation}\n\\end{document}";
+        let n = normalize(doc, Mode::Display);
+        assert!(
+            n.body.contains("\\begin{aligned}\na &= 1\n\\end{aligned}"),
+            "{}",
+            n.body
+        );
+        assert!(n.body.contains("\\\\ \nb = 2"), "{}", n.body);
+        // Mixed text and math is not stacked.
+        assert!(stack_display_blocks("\\[a\\] some text \\[b\\]").is_none());
     }
 
     #[test]

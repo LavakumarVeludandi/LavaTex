@@ -739,9 +739,17 @@ pub fn render_with(req: &RenderRequest, tc: &Toolchain) -> Result<RenderOutput, 
     // document wrapper or math delimiters unwrapped. Metadata keeps the
     // source exactly as typed.
     let norm = normalize::normalize(&req.source, req.mode);
+    let mut preamble = norm
+        .preamble
+        .clone()
+        .or_else(|| req.preamble.clone())
+        .unwrap_or_else(|| DEFAULT_PREAMBLE.to_string());
+    if norm.needs_amsmath && !preamble.contains("amsmath") && !preamble.contains("mathtools") {
+        preamble.push_str("\n\\usepackage{amsmath}");
+    }
     let typeset = RenderRequest {
         source: norm.body.clone(),
-        preamble: norm.preamble.clone().or_else(|| req.preamble.clone()),
+        preamble: Some(preamble),
         mode: norm.mode,
         ..req.clone()
     };

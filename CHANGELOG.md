@@ -20,6 +20,7 @@ Install the `.oxt` with *Tools › Extension Manager › Add…* and restart Lib
 - **Edit** an equation later: select it and run the command again. Your scaling, position and rotation are kept.
 - The LaTeX source is stored in the picture, its alt text, and LibreOffice shape properties, so it survives saving as ODP and PPTX.
 - Available from *Insert › LaTeX Equation…*, the standard toolbar, *Tools › Add-Ons*, and the **Extension** tab of the Tabbed (ribbon) interface.
+- **Multi-line equations:** end a line with `\\` for a new line, and use `&` to line lines up. Several `\[…\]` or `align*` blocks in a row are stacked.
 - Type just the formula, or IguanaTeX-style input: `$…$`, `\[…\]`, `align*` and similar environments, or a complete `\documentclass … \end{document}` document.
 - Preview in the dialog, with readable errors that point at the line you typed.
 - Choose the TeX installation and engine (latex, pdflatex, xelatex, lualatex, tectonic), font size, colour and output format.

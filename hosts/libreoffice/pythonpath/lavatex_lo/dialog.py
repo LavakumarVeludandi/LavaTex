@@ -70,7 +70,7 @@ class EquationDialog:
         inner = W - 2 * M
         self._add("FixedText", "lblSource", M, 6, inner, 9, Label="~LaTeX source")
         self._add("Edit", "source", M, 16, inner, 72, MultiLine=True, VScroll=True, FontName="Monospace",
-                  HelpText="Math is typeset in display style by default. Use \\\\ inside aligned/gathered for several lines.")
+                  HelpText="Type the formula. End a line with \\\\ to start a new line; use & to line lines up (e.g. at =).")
         self._add("FixedText", "lblPreamble", M, 92, inner, 9, Label="~Preamble (packages and macros)")
         self._add("Edit", "preamble", M, 102, inner, 30, MultiLine=True, VScroll=True, FontName="Monospace")
 
