@@ -5,6 +5,7 @@ LavaTeX needs two things: a **TeX distribution** (LavaTeX uses yours, just like 
 - [1. Install TeX](#1-install-tex)
 - [2. LibreOffice Impress and Draw](#2-libreoffice-impress-and-draw)
 - [3. ONLYOFFICE Presentation Editor](#3-onlyoffice-presentation-editor)
+- [4. PowerPoint (Windows)](#4-powerpoint-windows)
 - [Choosing a TeX installation, engine and format](#choosing-a-tex-installation-engine-and-format)
 - [Uninstalling](#uninstalling)
 - [Troubleshooting](#troubleshooting)
@@ -16,6 +17,7 @@ Downloads are on the [releases page](https://github.com/LavakumarVeludandi/LavaT
 | `lavatex-libreoffice-<version>-multi.oxt` | LibreOffice extension for every platform. **Use this one if unsure.** |
 | `lavatex-libreoffice-<version>-<platform>.oxt` | Smaller LibreOffice extension for one platform. |
 | `lavatex-<platform>.zip` | The `lavatex` program. Needed for ONLYOFFICE, optional otherwise. |
+| `lavatex-powerpoint-<version>-windows-x86_64.zip` | The PowerPoint add-in: `LavaTeX.ppam` and the `lavatex-helper.exe` it uses. |
 | `lavatex-onlyoffice-<version>.plugin` | The ONLYOFFICE plugin on its own. You don't normally need it: `lavatex setup onlyoffice` installs the plugin for you. |
 
 Platforms are `windows-x86_64`, `macos-aarch64` (Apple silicon), `macos-x86_64` (Intel), `linux-x86_64` and `linux-aarch64`.
@@ -125,6 +127,26 @@ The plugin couldn't reach the helper. Run `lavatex setup onlyoffice`, then click
 
 The plugin works in Document Server too, but the helper has to run on each user's own computer, because that's where TeX is. Install the plugin on the server as usual, have each user run `lavatex serve` (or `lavatex setup onlyoffice --plugins-dir <any folder>` for autostart), and enter the helper's address and the output of `lavatex token` under **Advanced: connect to a helper manually** on the plugin's first screen. Document Server support is not tested yet.
 
+## 4. PowerPoint (Windows)
+
+Needs PowerPoint 2016 or newer, or PowerPoint for Microsoft 365, on Windows. Like IguanaTeX, LavaTeX for PowerPoint is an add-in file (`LavaTeX.ppam`) that uses the TeX installed on your computer. Its editor window also needs the Microsoft Edge WebView2 Runtime, which comes with Windows 11 and Microsoft 365 (on older systems, get it from [Microsoft](https://developer.microsoft.com/microsoft-edge/webview2/)).
+
+1. Download `lavatex-powerpoint-<version>-windows-x86_64.zip` and unzip it somewhere permanent, for example `C:\Users\<you>\LavaTeX`. **Keep `LavaTeX.ppam` and `lavatex-helper.exe` in the same folder.**
+2. Windows blocks macros in files downloaded from the internet. Right-click `LavaTeX.ppam`, choose **Properties**, tick **Unblock** at the bottom and click **OK**.
+3. In PowerPoint, choose *File › Options › Add-ins*. At the bottom, set **Manage** to **PowerPoint Add-ins** and click **Go…**.
+4. Click **Add New…**, pick `LavaTeX.ppam`, and click **Enable Macros** when PowerPoint asks. Click **Close**.
+
+A **LavaTeX** tab now appears on the ribbon, after *Insert*:
+
+| Group | Button | What it does |
+|---|---|---|
+| Equation | **New Equation** | Opens the LavaTeX editor to type a new equation. |
+| | **Edit Equation** | Opens the editor with the selected equation's LaTeX. |
+| Selection | **Regenerate** | Renders the selected equations again from their LaTeX, for example after installing a missing package. |
+| LavaTeX | **Help**, **About** | The user guide and the version. |
+
+PowerPoint loads the add-in every time it starts. To update LavaTeX, replace both files in the folder with the new ones (close PowerPoint first).
+
 ## Choosing a TeX installation, engine and format
 
 LavaTeX picks a TeX installation automatically. To see what it found:
@@ -160,6 +182,7 @@ That folder holds `config.json` (TeX, engine, format), `helper-token` and `libre
 
 - **LibreOffice:** *Tools › Extension Manager*, select LavaTeX, **Remove**.
 - **ONLYOFFICE:** run `lavatex setup onlyoffice --uninstall`. It removes the plugin, the autostart entry and the installed programs.
+- **PowerPoint:** *File › Options › Add-ins › Manage: PowerPoint Add-ins › Go…*, select **LavaTeX**, click **Remove**. Then delete the LavaTeX folder.
 
 Equations you already inserted stay in your presentations as ordinary pictures.
 
@@ -175,4 +198,8 @@ Equations you already inserted stay in your presentations as ordinary pictures.
 | ONLYOFFICE: LavaTeX isn't on the Plugins tab | Make sure a **presentation** is open. Run `lavatex setup onlyoffice` again and restart ONLYOFFICE. If ONLYOFFICE is installed in an unusual way, pass `--plugins-dir`. |
 | ONLYOFFICE: "One-time setup needed" or "helper not available" | Run `lavatex setup onlyoffice`, then click **Try again**. |
 | ONLYOFFICE: equations can't be edited | Editing needs ONLYOFFICE 10.0 or newer. |
+| PowerPoint: no LavaTeX tab | Check that the add-in is listed and ticked under *Add-ins › Manage: PowerPoint Add-ins › Go…*. If PowerPoint says macros are disabled, unblock `LavaTeX.ppam` (step 2 of the PowerPoint section), then remove and add it again. |
+| PowerPoint: "LavaTeX cannot find lavatex-helper.exe" | Put `lavatex-helper.exe` in the same folder as `LavaTeX.ppam`. |
+| PowerPoint: the editor window doesn't open, mentioning WebView2 | Install the [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/). |
+| PowerPoint: nothing happens, or security software warns | Some company security policies stop Office from starting other programs. LavaTeX needs to start `lavatex-helper.exe`; ask your IT department to allow it. |
 | Equation is no longer editable after converting the file | Some converters drop alt text. The picture may still carry its source: `lavatex inspect picture.svg`. |

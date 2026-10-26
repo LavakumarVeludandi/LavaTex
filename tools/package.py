@@ -3,11 +3,16 @@
 
     python3 tools/package.py libreoffice [--bin linux-x86_64=target/release/lavatex ...]
     python3 tools/package.py onlyoffice
+    python3 tools/package.py powerpoint --helper path/to/lavatex-helper.exe
     python3 tools/package.py all
 
 Without --bin, the LibreOffice package bundles target/release/lavatex (or the
 debug build) for the current platform. Pass several --bin options to build a
 multi-platform .oxt (CI does this).
+
+The PowerPoint package needs hosts/powerpoint/LavaTeX.ppam, which is saved
+by hand in PowerPoint (see docs/building-powerpoint-addin.md), and the
+Windows build of lavatex-helper.exe.
 """
 
 import argparse
@@ -91,15 +96,55 @@ def build_onlyoffice():
     return out
 
 
+POWERPOINT_README = """LavaTeX {version} for PowerPoint (Windows)
+
+1. Install a TeX distribution if you have none: MiKTeX (https://miktex.org)
+   or TeX Live (https://tug.org/texlive).
+2. Put this folder somewhere permanent, for example
+   C:\\Users\\<you>\\LavaTeX. Keep LavaTeX.ppam and lavatex-helper.exe
+   together in it.
+3. If you downloaded the zip from the internet: right-click LavaTeX.ppam,
+   choose Properties, tick "Unblock" and click OK (otherwise PowerPoint
+   blocks its macros).
+4. In PowerPoint: File > Options > Add-ins. At "Manage", choose
+   "PowerPoint Add-ins" and click Go. Click "Add New...", choose
+   LavaTeX.ppam, and click "Enable Macros".
+5. The LavaTeX tab appears on the ribbon. Click "New Equation".
+
+User guide: https://github.com/LavakumarVeludandi/LavaTex/blob/master/docs/usage.md
+"""
+
+
+def build_powerpoint(helper):
+    ppam = os.path.join(ROOT, "hosts", "powerpoint", "LavaTeX.ppam")
+    if not os.path.isfile(ppam):
+        sys.exit("hosts/powerpoint/LavaTeX.ppam is missing; see docs/building-powerpoint-addin.md.")
+    if not helper or not os.path.isfile(helper):
+        sys.exit("Pass --helper path/to/lavatex-helper.exe (the Windows build).")
+    os.makedirs(DIST, exist_ok=True)
+    out = os.path.join(DIST, "lavatex-powerpoint-%s-windows-x86_64.zip" % version())
+    folder = "LavaTeX/"
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.write(ppam, folder + "LavaTeX.ppam")
+        zf.write(helper, folder + "lavatex-helper.exe")
+        zf.writestr(folder + "README.txt", POWERPOINT_README.format(version=version()).replace("\n", "\r\n"))
+        zf.write(os.path.join(ROOT, "LICENSE"), folder + "LICENSE.txt")
+    print(out)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("target", choices=["libreoffice", "onlyoffice", "all"])
+    ap.add_argument("target", choices=["libreoffice", "onlyoffice", "powerpoint", "all"])
     ap.add_argument("--bin", action="append", default=[], help="platform-tag=path/to/lavatex")
+    ap.add_argument("--helper", help="Windows lavatex-helper.exe for the PowerPoint package")
     args = ap.parse_args()
     if args.target in ("libreoffice", "all"):
         build_libreoffice(args.bin)
     if args.target in ("onlyoffice", "all"):
         build_onlyoffice()
+    if args.target == "powerpoint" or (args.target == "all" and args.helper):
+        build_powerpoint(args.helper)
 
 
 if __name__ == "__main__":

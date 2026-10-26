@@ -79,6 +79,8 @@ jobs:
           npm install --no-save playwright@1.48.2
           npx playwright install --with-deps chromium
           node hosts/onlyoffice/tests/e2e.js target/debug/lavatex
+      - name: PowerPoint editor page tests
+        run: node hosts/editor/tests/e2e.js target/debug/lavatex
 
   package:
     name: Packages
@@ -89,7 +91,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: bins
-      - name: Build .oxt (multi-platform and per platform), ONLYOFFICE .plugin and CLI archives
+      - name: Build .oxt (multi-platform and per platform), ONLYOFFICE .plugin, PowerPoint and CLI archives
         run: |
           set -euo pipefail
           args=()
@@ -109,6 +111,15 @@ jobs:
             chmod +x "$dir"/lavatex*
             (cd "$dir" && zip -q "../../dist/lavatex-$tag.zip" lavatex*)
           done
+          # PowerPoint: the .ppam saved in PowerPoint (committed) + the engine.
+          if [ -f hosts/powerpoint/LavaTeX.ppam ]; then
+            python3 tools/package.py powerpoint --helper bins/lavatex-windows-x86_64/lavatex-helper.exe
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "::error::hosts/powerpoint/LavaTeX.ppam is missing (see docs/building-powerpoint-addin.md)"
+            exit 1
+          else
+            echo "::warning::hosts/powerpoint/LavaTeX.ppam is missing; no PowerPoint package built"
+          fi
           ls -la dist
       - uses: actions/upload-artifact@v4
         with:
