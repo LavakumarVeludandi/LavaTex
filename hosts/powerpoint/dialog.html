@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LavaTeX</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="styles/taskpane.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+</head>
+<body>
+  <main class="message">
+    <pre id="text"></pre>
+    <div><button id="ok" type="button" class="btn primary">OK</button></div>
+  </main>
+  <script>
+    (function () {
+      var m = /[?&]m=([^&]*)/.exec(window.location.search);
+      document.getElementById("text").textContent = m ? decodeURIComponent(m[1].replace(/\+/g, " ")) : "";
+      document.getElementById("ok").addEventListener("click", function () {
+        try {
+          Office.context.ui.messageParent("close");
+        } catch (e) {
+          window.close();
+        }
+      });
+      Office.onReady(function () {});
+    })();
+  </script>
+</body>
+</html>

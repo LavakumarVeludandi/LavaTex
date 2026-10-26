@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>LavaTeX</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Written in by the LavaTeX helper that serves this page. -->
+  <meta name="lavatex-token" content="__LAVATEX_TOKEN__">
+  <link rel="stylesheet" href="styles/taskpane.css">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="scripts/lavatex-core.js"></script>
+  <script src="scripts/powerpoint.js"></script>
+  <script src="scripts/taskpane.js"></script>
+</head>
+<body>
+  <main class="lt">
+    <div id="banner" class="banner" role="status" hidden>
+      <span id="bannerText"></span>
+      <button id="bannerAction" type="button" class="link" hidden></button>
+    </div>
+
+    <label for="source" class="lbl"><span id="modeTitle">New equation</span></label>
+    <textarea id="source" class="code" rows="5" spellcheck="false"
+      aria-describedby="sourceHint" placeholder="\frac{-b \pm \sqrt{b^2-4ac}}{2a}"></textarea>
+    <div id="sourceHint" class="hint">End a line with <code>\\</code> for a new line; use <code>&amp;</code> to line up lines. Ctrl+Enter inserts.</div>
+
+    <div class="actions">
+      <button id="insert" type="button" class="btn primary">Insert</button>
+      <button id="newEquation" type="button" class="btn" hidden>New equation</button>
+    </div>
+
+    <div id="preview" class="preview" aria-label="Preview"><span class="placeholder">Type LaTeX above to see a preview.</span></div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <details id="detailsBox" hidden>
+      <summary>Details</summary>
+      <pre id="details"></pre>
+    </details>
+
+    <details id="preambleBox">
+      <summary>Preamble (packages and macros)</summary>
+      <textarea id="preamble" class="code" rows="3" spellcheck="false" aria-label="Preamble"></textarea>
+    </details>
+
+    <div class="options">
+      <label>Mode
+        <select id="mode">
+          <option value="display">Display</option>
+          <option value="inline">Inline</option>
+          <option value="text">Text</option>
+        </select>
+      </label>
+      <label>Size (pt)
+        <input id="fontSize" type="number" min="1" max="500" step="1">
+      </label>
+      <label>Color
+        <input id="color" type="color">
+      </label>
+    </div>
+
+    <details id="settingsBox" class="settings">
+      <summary>Settings</summary>
+      <div class="options">
+        <label>Output
+          <select id="format">
+            <option value="svg">SVG (vector)</option>
+            <option value="png">PNG (bitmap)</option>
+          </select>
+        </label>
+        <label id="dpiLabel">PNG dpi
+          <input id="pngDpi" type="number" min="36" max="2400" step="1">
+        </label>
+      </div>
+      <label class="block">TeX installation
+        <select id="toolchain"></select>
+      </label>
+      <label class="block">Engine
+        <select id="engine">
+          <option value="">Automatic</option>
+          <option value="latex">latex</option>
+          <option value="pdflatex">pdflatex</option>
+          <option value="xelatex">xelatex</option>
+          <option value="lualatex">lualatex</option>
+          <option value="tectonic">tectonic</option>
+        </select>
+      </label>
+      <p class="hint">New equations use these settings and the preamble above. <span id="helperInfo"></span></p>
+    </details>
+  </main>
+</body>
+</html>

@@ -31,6 +31,14 @@ jobs:
         with:
           targets: ${{ matrix.target }}
           components: clippy, rustfmt
+      # ring (TLS for the PowerPoint add-in) compiles C code; static Linux
+      # builds need a musl C compiler.
+      - if: contains(matrix.target, 'musl')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends musl-tools
+          target_env=$(echo "${{ matrix.target }}" | tr '-' '_')
+          echo "CC_${target_env}=musl-gcc" >> "$GITHUB_ENV"
       - if: matrix.test
         run: cargo fmt --all --check
       - if: matrix.test
@@ -79,6 +87,8 @@ jobs:
           npm install --no-save playwright@1.48.2
           npx playwright install --with-deps chromium
           node hosts/onlyoffice/tests/e2e.js target/debug/lavatex
+      - name: PowerPoint add-in tests
+        run: node hosts/powerpoint/tests/e2e.js target/debug/lavatex
 
   package:
     name: Packages

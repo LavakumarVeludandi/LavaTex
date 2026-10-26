@@ -3,6 +3,12 @@
 
 pub mod serve;
 pub mod setup;
+pub mod tls;
+
+/// Host files compiled into the binary (see build.rs).
+pub mod embedded {
+    include!(concat!(env!("OUT_DIR"), "/plugin_files.rs"));
+}
 
 use base64::Engine as _;
 use lavatex_core::config::Config;

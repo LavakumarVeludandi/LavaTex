@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### PowerPoint add-in (new)
+
+LavaTeX now works in **PowerPoint for Microsoft 365** (Windows and macOS) and PowerPoint for the web, like IguanaTeX but with the same equations as LibreOffice and ONLYOFFICE.
+
+- A **LavaTeX tab** on the ribbon: *New Equation*, *Edit Equation*, *Regenerate* (render selected equations again from their LaTeX), *Settings* and *Help*.
+- A side pane with live preview that follows your selection: click an equation on the slide to edit it.
+- Editing keeps the equation's scale, position, rotation and place in the stacking order.
+- The LaTeX source is stored in the picture's tags and alt text, so equations are editable in PowerPoint, LibreOffice and ONLYOFFICE alike.
+- Set up with one command, `lavatex setup powerpoint`: it registers the add-in, creates and trusts a certificate for `https://localhost` (PowerPoint only loads add-ins over HTTPS), and starts the helper at login. `--uninstall` removes it all.
+- Tested against a simulated PowerPoint (Office.js) in Chromium; please report how it works in real PowerPoint.
+
 ### ONLYOFFICE plugin
 
 Tested in ONLYOFFICE Desktop Editors 10.0.
@@ -22,6 +33,10 @@ Tested in ONLYOFFICE Desktop Editors 10.0.
 ### LibreOffice
 
 - The dialog preview no longer crops tall (multi-line) equations.
+
+### Fixes
+
+- ONLYOFFICE: clicking Insert right after typing could do nothing, because the pending preview replaced the render that Insert was waiting for.
 
 ## [0.1.0] - 2026-10-26
 

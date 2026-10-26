@@ -27,6 +27,9 @@ base64.workspace = true
 clap = { version = "4", features = ["derive", "env"] }
 tiny_http = "0.12"
 getrandom = "0.2"
+# HTTPS for the PowerPoint add-in (Office requires HTTPS add-in pages).
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rcgen = { version = "0.13", default-features = false, features = ["ring", "pem", "crypto"] }
 
 [dev-dependencies]
 tempfile = "3"
