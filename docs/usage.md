@@ -1,12 +1,11 @@
 # Using LavaTeX
 
-LavaTeX works the same way in LibreOffice, ONLYOFFICE and PowerPoint: type LaTeX, look at the preview, insert. The result is an ordinary picture on your slide that LavaTeX can edit again later.
+LavaTeX works the same way in LibreOffice and ONLYOFFICE: type LaTeX, look at the preview, insert. The result is an ordinary picture on your slide that LavaTeX can edit again later.
 
 ![Equations inserted with LavaTeX in LibreOffice Impress](images/libreoffice-slide.png)
 
 - [Insert an equation](#insert-an-equation)
 - [Edit an equation](#edit-an-equation)
-- [Regenerate equations (PowerPoint)](#regenerate-equations-powerpoint)
 - [Writing LaTeX](#writing-latex)
 - [Dialog options](#dialog-options)
 - [Sharing presentations](#sharing-presentations)
@@ -22,15 +21,11 @@ LavaTeX works the same way in LibreOffice, ONLYOFFICE and PowerPoint: type LaTeX
 
 ![The LavaTeX dialog in ONLYOFFICE](images/onlyoffice-dialog.png)
 
-**PowerPoint:** on the **LavaTeX** tab, click **New Equation**. The LavaTeX pane opens at the side of the window and stays open while you work, so you can insert several equations in a row.
-
-<img src="images/powerpoint-taskpane.png" alt="The LavaTeX pane in PowerPoint" width="300">
-
 Then:
 
 1. Type the formula into **LaTeX source**, for example `\frac{-b \pm \sqrt{b^2-4ac}}{2a}`. You don't need `$` signs or a document around it.
 2. The preview updates as you type. Mistakes are shown under the preview, with the line they are on.
-3. Click **Insert**, or press **Ctrl+Enter** (**Cmd+Enter** on a Mac).
+3. Click **Insert**, or press **Ctrl+Enter**.
 
 The equation is placed in the middle of the slide. Move, resize and rotate it like any picture.
 
@@ -38,17 +33,11 @@ The equation is placed in the middle of the slide. Move, resize and rotate it li
 
 ## Edit an equation
 
-Select the equation and open LavaTeX the same way as for inserting (in PowerPoint: **Edit Equation**). The dialog opens with the equation's source and settings. Change it and click **Update** (LibreOffice, PowerPoint) or **Insert** (ONLYOFFICE).
-
-In PowerPoint the pane follows your selection: while it is open, click another equation on the slide to edit that one. If you have typed something you haven't applied yet, LavaTeX asks first. **New equation** in the pane starts a new one.
+Select the equation and open LavaTeX the same way as for inserting. The dialog opens with the equation's source and settings. Change it and click **Update** (LibreOffice) or **Insert** (ONLYOFFICE).
 
 The new picture replaces the old one at the same position, rotation and scale. If you had made the equation twice as big on the slide, the edited one is twice as big too, and a longer equation gets wider instead of being squeezed.
 
-Editing works for equations made in any of the apps: an equation made in LibreOffice and saved as PPTX can be edited in PowerPoint or ONLYOFFICE, and the other way round. ONLYOFFICE needs version 10.0 or newer to edit.
-
-## Regenerate equations (PowerPoint)
-
-Select one or more equations and click **Regenerate** on the LavaTeX tab. Each one is rendered again from its own LaTeX, keeping its size, position and rotation. Use this after installing a missing package, or to update equations made on another computer with your TeX. Other selected objects are left alone.
+Editing works for equations made in either app: an equation made in LibreOffice and saved as PPTX can be edited in ONLYOFFICE, and the other way round. ONLYOFFICE needs version 10.0 or newer to edit.
 
 ## Writing LaTeX
 
@@ -112,17 +101,17 @@ Any package installed in your TeX distribution can be used. The preamble is save
 | **Mode** | *Display* for stand-alone formulas (big fractions and sums), *Inline* for text-style formulas, *Text* for normal text, which can contain `$…$`. |
 | **Size (pt)** | Font size of the equation. 20–32 pt suits most slides. |
 | **Color** | Colour of the equation. |
-| **Output** | *SVG* (sharp at any size; recommended), *PDF* (sharp; LibreOffice only, and only when your LibreOffice can show PDF pictures), or *PNG* (a picture at the chosen DPI, for apps that don't handle vector pictures). |
+| **Output** | *SVG* (sharp at any size; recommended), *PDF* (sharp; not offered when your LibreOffice can't show PDF pictures), or *PNG* (a picture at the chosen DPI, for apps that don't handle vector pictures). |
 | **TeX** | Which TeX installation to use, if you have more than one. *Automatic* uses the one `lavatex detect` suggests. |
 | **Engine** | `latex` (fastest, default), `pdflatex`, `xelatex` or `lualatex` (for system fonts and Unicode input, with `fontspec`), or `tectonic`. |
 
-Your last choices are kept for the next equation. In PowerPoint, Output, TeX and Engine are under **Settings** in the pane (or the **Settings** button on the ribbon).
+LibreOffice keeps your last choices for the next equation; ONLYOFFICE keeps them in the plugin.
 
 ## Sharing presentations
 
 Equations are ordinary pictures, so people **without LavaTeX** see them exactly as you do, in any app: LibreOffice, ONLYOFFICE, PowerPoint, Keynote, Google Slides, PDF export.
 
-The LaTeX source is stored three times: in the picture file itself, in the picture's alt text, and in hidden shape properties (LibreOffice) or tags (PowerPoint). An app that converts pictures may drop the first copy, but any one of them is enough. That is why it survives saving as ODP or PPTX and moving between apps. The alt text starts with the LaTeX source, which also helps screen-reader users.
+The LaTeX source is stored three times: in the picture file itself, in the picture's alt text, and (in LibreOffice) in hidden shape properties. That is why it survives saving as ODP or PPTX and moving between apps. The alt text starts with the LaTeX source, which also helps screen-reader users.
 
 Anyone who installs LavaTeX can edit your equations, using their own TeX installation.
 

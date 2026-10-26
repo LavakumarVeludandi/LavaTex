@@ -358,8 +358,6 @@
       setStatus("Connect to the LavaTeX helper first.", "error");
       return;
     }
-    // A pending preview would start a newer render and supersede this one.
-    clearTimeout(state.timer);
     render().then(function (res) {
       if (!res) return;
       var size = LT.sizeEmu(res, state.editing);

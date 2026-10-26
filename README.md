@@ -1,6 +1,6 @@
 # LavaTeX
 
-**Write once. Typeset everywhere.** LaTeX equations for LibreOffice Impress/Draw, the ONLYOFFICE Presentation Editor and PowerPoint, inspired by IguanaTeX.
+**Write once. Typeset everywhere.** LaTeX equations for LibreOffice Impress/Draw and the ONLYOFFICE Presentation Editor, inspired by IguanaTeX for PowerPoint.
 
 LavaTeX turns LaTeX into an ordinary **SVG, PDF or PNG picture** using the TeX installation you already have (TeX Live, MiKTeX, MacTeX or Tectonic). The LaTeX source travels *inside* the picture and its alt text, so:
 
@@ -17,7 +17,7 @@ LavaTeX turns LaTeX into an ordinary **SVG, PDF or PNG picture** using the TeX i
 |---|---|---|
 | LibreOffice Impress & Draw 7.0+ | `lavatex-libreoffice-<version>-multi.oxt` | Released in 0.1.0. Insert, edit and preview. Tested on LibreOffice 24.2 and 26.2 (Linux). |
 | ONLYOFFICE Presentation Editor 8.3+ (editing needs 10.0+) | `lavatex-<platform>.zip`, then `lavatex setup onlyoffice` | Ready for the next release. Insert, edit and live preview, offline. Tested in ONLYOFFICE Desktop Editors 10.0, including editing equations made in LibreOffice (see [compatibility](docs/compatibility.md)). |
-| PowerPoint for Microsoft 365 (Windows, macOS, web) | `lavatex-<platform>.zip`, then `lavatex setup powerpoint` | New, ready for testing. A **LavaTeX** ribbon tab (New Equation, Edit Equation, Regenerate, Settings, Help) and a side pane with live preview. Tested against a simulated PowerPoint; not yet in real PowerPoint. |
+| PowerPoint | — | Planned: Office.js add-in reusing the ONLYOFFICE web UI and helper. |
 
 ## Quick start
 
@@ -25,7 +25,6 @@ LavaTeX turns LaTeX into an ordinary **SVG, PDF or PNG picture** using the TeX i
 2. **Install LavaTeX** from the [releases page](https://github.com/LavakumarVeludandi/LavaTex/releases):
    - **LibreOffice:** download the `.oxt`, then *Tools › Extension Manager › Add…* and restart LibreOffice. Use *Insert › LaTeX Equation…* or the **Σ** toolbar button.
    - **ONLYOFFICE:** download `lavatex-<platform>.zip`, unzip it, and run `lavatex setup onlyoffice` once. It installs the plugin and a small helper that starts by itself. Restart ONLYOFFICE and use *Plugins › LavaTeX*.
-   - **PowerPoint:** download `lavatex-<platform>.zip`, unzip it, and run `lavatex setup powerpoint` once (click **Yes** when Windows asks to trust the LavaTeX certificate). Restart PowerPoint and use the **LavaTeX** tab.
 3. **Edit** an equation later: select it and open LavaTeX again.
 
 | LibreOffice | ONLYOFFICE |
@@ -39,11 +38,11 @@ LavaTeX turns LaTeX into an ordinary **SVG, PDF or PNG picture** using the TeX i
 LaTeX source ──► │ find your TeX  →  sandboxed compile  →  SVG / PDF / PNG          │ ──► picture + source
                  │ (TeX Live, MiKTeX, MacTeX, Tectonic)    + embedded metadata      │
                  └──────────────────────────────────────────────────────────────────┘
-                      ▲ CLI (stdin/stdout JSON)              ▲ lavatex-helper (localhost HTTP/HTTPS)
-          LibreOffice extension (Python UNO)        ONLYOFFICE plugin, PowerPoint add-in (HTML/JS)
+                      ▲ CLI (stdin/stdout JSON)              ▲ lavatex-helper (localhost HTTP)
+          LibreOffice extension (Python UNO)        ONLYOFFICE plugin (HTML/JS)
 ```
 
-ONLYOFFICE plugins and PowerPoint add-ins are web pages that may not start programs, so they talk to a small helper on your own computer, which `lavatex setup onlyoffice` / `lavatex setup powerpoint` installs and starts at login. LibreOffice runs `lavatex` directly. See [docs/design.md](docs/design.md).
+ONLYOFFICE plugins are web pages that may not start programs, so ONLYOFFICE talks to a small helper on your own computer, which `lavatex setup onlyoffice` installs and starts at login. LibreOffice runs `lavatex` directly. See [docs/design.md](docs/design.md).
 
 ## Writing equations
 
@@ -78,10 +77,9 @@ $ lavatex render --request req.json --json -o out.pdf   # machine interface used
 
 ```
 crates/lavatex-core     Rust library: TeX discovery, sandboxed rendering, metadata embed/extract
-crates/lavatex-cli      `lavatex` (detect, render, inspect, config, setup, serve) and `lavatex-helper` (HTTP + HTTPS)
+crates/lavatex-cli      `lavatex` (detect, render, inspect, config, setup, serve) and `lavatex-helper`
 hosts/libreoffice       LibreOffice extension (Python UNO): dialog, insert/edit, packaging metadata
 hosts/onlyoffice        ONLYOFFICE plugin (HTML/JS) + shared browser core (scripts/lavatex-core.js)
-hosts/powerpoint        PowerPoint add-in (Office.js): manifest with the ribbon tab, task pane, ribbon commands
 fixtures/metadata       Cross-language metadata fixture (Rust writes it; JS and Python must parse it)
 docs/                   Installation and usage guides, design, metadata format, compatibility
 tools/package.py        Builds dist/*.oxt and dist/*.plugin
@@ -93,7 +91,6 @@ tools/package.py        Builds dist/*.oxt and dist/*.plugin
 cargo test                                         # core unit tests (incl. shared fixture)
 node --test hosts/onlyoffice/tests/core.test.js    # browser core
 node hosts/onlyoffice/tests/e2e.js target/debug/lavatex   # plugin page + real helper (needs Playwright)
-node hosts/powerpoint/tests/e2e.js target/debug/lavatex   # add-in over HTTPS + simulated PowerPoint
 python3 hosts/libreoffice/tests/test_headless.py   # real LibreOffice: insert, edit, save ODP/PPTX, reopen
 python3 tools/package.py all                       # build dist/ packages
 ```

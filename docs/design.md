@@ -15,12 +15,11 @@ This document updates *LavaTeX Software Design Document v0.1* with the decisions
 |---|---|---|
 | `lavatex-core` | Rust library | TeX discovery, render pipelines, sandboxing, error mapping, metadata embedding and extraction |
 | `lavatex` CLI | Rust binary | `detect`, `render` (JSON in/out for hosts), `inspect`, `config`, `token`, `serve` |
-| `lavatex serve` / `lavatex-helper` | Rust, `tiny_http`, `rustls` | Localhost helper for browser-based hosts: HTTP on 7354, and HTTPS on 7355 (serving the PowerPoint add-in) once a certificate exists. `lavatex-helper` is the same server without a console window, for autostart. |
-| `lavatex setup onlyoffice` / `powerpoint` | Rust | Installs the embedded plugin or registers the add-in, creates the HTTPS certificate (PowerPoint), installs the programs and the helper's autostart |
+| `lavatex serve` / `lavatex-helper` | Rust, `tiny_http` | Localhost HTTP helper for browser-based hosts. `lavatex-helper` is the same server without a console window, for autostart. |
+| `lavatex setup onlyoffice` | Rust | Installs the embedded plugin, the programs and the helper's autostart, and pairs plugin and helper |
 | LibreOffice extension | Python UNO + bundled `lavatex` | Dialog, insert/replace `GraphicObjectShape`, metadata on shapes |
 | ONLYOFFICE plugin | HTML/JS | Dialog with live preview, insert/replace through the Builder API, alt-text metadata |
-| PowerPoint add-in | Office.js (served by the helper) | Ribbon tab, task pane with live preview, insert/replace through `setSelectedDataAsync` and the PowerPoint API, tag + alt-text metadata |
-| `scripts/lavatex-core.js` | Plain JS (UMD) | Alt-text parsing, sizing, helper client; shared by the ONLYOFFICE plugin and the PowerPoint add-in |
+| `scripts/lavatex-core.js` | Plain JS (UMD) | Alt-text parsing, sizing, helper client; reusable by a future Office.js add-in |
 
 ### Loading the ONLYOFFICE plugin SDK
 
@@ -55,20 +54,6 @@ Users should not have to start a server. `lavatex setup onlyoffice` does it once
 The plugin reads `lavatex-helper.json` from its own folder, so it connects without asking the user anything. Manual URL and token entry remain under *Advanced* for Document Server.
 
 We chose this over a browser-only renderer (MathJax): like IguanaTeX, LavaTeX renders with the user's own TeX, so any package and the same output as in LibreOffice are available.
-
-### PowerPoint add-in
-
-IguanaTeX is a VBA add-in (`.ppam`): it can run TeX directly, but macros are often blocked, and on macOS the sandbox makes running TeX hard. A VSTO/C# add-in would be Windows-only. LavaTeX uses an **Office.js web add-in** instead: it runs on Windows, macOS and the web, has a real ribbon tab (declared in the manifest's `VersionOverrides`), and reuses the ONLYOFFICE plugin's browser core and the helper.
-
-**Hosting.** Office loads add-in pages only over HTTPS. Rather than depending on a website (which would need the internet and could drift from the installed helper), the helper serves the add-in itself at `https://localhost:7355/powerpoint/`. TLS connections are decrypted (rustls with *ring*) and handed to the same HTTP handler as port 7354, one request per connection.
-
-**Certificate.** `lavatex setup powerpoint` creates a CA with X.509 name constraints that permit only `localhost`, `127.0.0.1` and `::1`, signs a server certificate with it and **discards the CA's private key**. Only the CA certificate is trusted (Windows: current user's Root store with `certutil -user`; macOS: login keychain; Linux: the NSS database used by Chrome). Even if the CA certificate leaked, nothing else can be signed with it, and it could not vouch for any other host.
-
-**Pairing.** The helper writes the access token into the HTML pages it serves. They are sent without CORS headers, and requests marked `Sec-Fetch-Site: cross-site` or with a foreign `Origin` are refused, so other web pages cannot read the token. The pages then call the API on their own origin.
-
-**Registration.** Windows: the manifest path under `HKCU\Software\Microsoft\Office\16.0\WEF\Developer` (how Office's own tools sideload add-ins). macOS: a copy in PowerPoint's `wef` folder. PowerPoint for the web: the user uploads the manifest.
-
-**Editing.** PowerPoint has no "replace picture" call. The add-in deselects the old picture, inserts the new one at the old position with `setSelectedDataAsync` (SVG via `CoercionType.XmlSvg`, PNG via `Image`), finds it by comparing the slide's shape ids, copies rotation, moves it down with `setZOrder` until it sits just above the old one, and deletes the old one. Features are used according to the PowerPoint API version: 1.5 (selection) is required; tags need 1.3, z-order 1.8, alt text, rotation and slide size 1.10.
 
 ## Accepted input
 
@@ -114,7 +99,7 @@ Error messages are mapped to plain language and to a line in the user's source o
 | Primary TeX engine | The user's choice. Auto order: latex+dvisvgm (TeX Live → MacTeX → MiKTeX) → others → Tectonic. |
 | SVG conversion | dvisvgm `--no-fonts` primarily; pdftocairo for PDF-only engines. |
 | Metadata persistence | Three layers: host properties, alt text, image bytes. Verified on ODP and PPTX. |
-| UI sharing | Shared web core for HTML hosts (ONLYOFFICE plugin, PowerPoint add-in); native UNO dialog for LibreOffice. |
+| UI sharing | Shared web core for HTML hosts (ONLYOFFICE now, Office.js later); native UNO dialog for LibreOffice. |
 | License | Apache-2.0. No IguanaTeX or TexMaths code is used. |
 
 ## Known limitations (0.1.0)
@@ -123,13 +108,11 @@ Error messages are mapped to plain language and to a line in the user's source o
 - Tectonic's PDF output compresses the info dictionary, so the source lives in alt text only for Tectonic PDFs.
 - Inline equations inside text boxes, with baseline alignment, are out of scope. `depthBp` is recorded for a future version.
 - The ONLYOFFICE setup has been tested on Linux (systemd socket activation and XDG autostart). The Windows and macOS autostart paths are implemented but untested.
-- The PowerPoint add-in has been tested against a simulated Office.js, not yet in real PowerPoint. The add-in page needs the helper running; if it is not, PowerPoint shows its own "can't load this add-in" message.
-- The PowerPoint add-in loads `office.js` from Microsoft's CDN, as Office requires, so opening the pane needs an internet connection the first time.
 
 ## Next steps
 
 1. CI release builds for Windows, macOS (x86_64 and arm64) and Linux, producing a multi-platform `.oxt`.
 2. Validate in ONLYOFFICE Document Server (Desktop Editors 10.0 is tested).
 3. Test the setup on Windows and macOS; consider an installer that runs it.
-4. Test the PowerPoint add-in in real PowerPoint on Windows and macOS. Then: import IguanaTeX equations (read IguanaTeX's shape tags) so existing IguanaTeX decks become editable with LavaTeX.
+4. Build a PowerPoint Office.js add-in reusing `lavatex-core.js` and the helper. Read IguanaTeX tags for round trips.
 5. LibreOffice Writer and ONLYOFFICE Document Editor support.

@@ -5,7 +5,7 @@
 LavaTeX compiles LaTeX, which is a programming language. The main risks are:
 
 1. **Equations from other people's documents.** The source and preamble stored in a picture come from whoever made the file.
-2. **Other software on the same machine**, and **web pages in the browser**, talking to the helper used by ONLYOFFICE and PowerPoint.
+2. **Other software on the same machine** talking to the ONLYOFFICE helper.
 
 ## Defences
 
@@ -21,11 +21,6 @@ LavaTeX compiles LaTeX, which is a programming language. The main risks are:
   - random bearer token stored with owner-only permissions, compared in constant time; `lavatex setup onlyoffice` also writes it, owner-only, into the plugin's own folder so the plugin can pair;
   - request bodies capped at 512 KiB;
   - no endpoints that read files or run anything other than the renderer; `/v1/shutdown` (token required) only stops the helper.
-- **PowerPoint add-in over HTTPS:**
-  - the certificate authority created by `lavatex setup powerpoint` is name-constrained to `localhost`, `127.0.0.1` and `::1`, and its private key is deleted right after it signs the helper's certificate, so it cannot be used to impersonate other sites;
-  - the helper's private key is stored with owner-only permissions;
-  - the add-in pages contain the access token, so they are served only over HTTPS, without CORS headers, and refused to cross-site requests and foreign origins.
-
 
 Custom preambles and packages extend what LaTeX can do. Packages from CTAN are as trusted as your TeX installation.
 
