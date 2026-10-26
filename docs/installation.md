@@ -23,14 +23,19 @@ lavatex config --format svg         # optional: preferred output
 
 1. *Tools › Extension Manager › Add...* and choose `lavatex-libreoffice-<version>-<platform>.oxt`. Use the `multi` package if you're unsure of your platform.
 2. Restart LibreOffice.
-3. To insert, use *Insert › LaTeX Equation...*, the toolbar button next to *Insert Image*, or *Tools › Add-Ons › LaTeX Equation (LavaTeX)...*.
+3. To insert, use *Insert › LaTeX Equation...*, the toolbar button next to *Insert Image*, or *Tools › Add-Ons › LaTeX Equation (LavaTeX)...*. In the **Tabbed** interface (*View › User Interface › Tabbed*), open the **Extension** tab and click the **Σ** button.
 4. To edit, select an equation and run the same command. The dialog opens with its source and settings.
 
 The `.oxt` contains the `lavatex` binary for its platform(s). To use another build, put `lavatex` on PATH and set `"corePath"` in `libreoffice.json` in the LavaTeX config folder.
 
 ## 3. ONLYOFFICE (Presentation Editor)
 
-1. Install the plugin: *Plugins › Plugin Manager › Install plugin manually* (Desktop Editors 8.3+), and choose `lavatex-onlyoffice-<version>.plugin`. On Document Server, copy the unzipped folder into `sdkjs-plugins`.
+1. Open a **presentation** (LavaTeX only appears in the Presentation Editor), then go to *Plugins › Plugin Manager* and click the **Install plugin manually** link in the Plugin Manager window. Choose `lavatex-onlyoffice-<version>.plugin`.
+
+   To install by hand instead, unzip the `.plugin` into a folder named `{6C1B2C4E-8D53-4F0A-9B7E-4A1E5D2F7C31}` inside the user plugin folder, then restart ONLYOFFICE:
+   - Linux: `~/.local/share/onlyoffice/desktopeditors/data/sdkjs-plugins/`
+   - Linux Flatpak: `~/.var/app/org.onlyoffice.desktopeditors/data/onlyoffice/desktopeditors/data/sdkjs-plugins/`
+   - Document Server: the server's `sdkjs-plugins` folder.
 2. Start the helper and keep it running:
    ```console
    lavatex serve        # listens on http://127.0.0.1:7354

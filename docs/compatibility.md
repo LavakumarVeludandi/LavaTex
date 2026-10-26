@@ -8,7 +8,7 @@ Only combinations listed as **tested** have been run. Everything else is expecte
 |---|---|---|
 | Core | Linux x86_64, TeX Live 2023 (Debian) | latex, pdflatex, xelatex, lualatex × SVG, PDF, PNG all render, and metadata reads back from every output. Error mapping and file sandbox work. |
 | LibreOffice | LibreOffice 24.2.7, Linux, Python-UNO, headless | Insert SVG/PDF/PNG; edit keeps scale and position without duplicating; save as ODP and PPTX, reopen, edit again (`hosts/libreoffice/tests/test_headless.py`). |
-| LibreOffice | LibreOffice 24.2.7, Linux, Xvfb, installed `.oxt` | `unopkg` installs and registers; menu, add-on and toolbar entries appear; dialog opens on a selected equation with its source; typing and *Update* replace the equation. |
+| LibreOffice | LibreOffice 24.2.7, Linux, Xvfb, installed `.oxt` | `unopkg` installs and registers; menu, add-on and toolbar entries appear, and the Tabbed UI's Extension tab button opens the dialog; dialog opens on a selected equation with its source; typing and *Update* replace the equation. |
 | ONLYOFFICE plugin | Chromium (Playwright) with a mock presentation API + real `lavatex serve` | Setup/token flow, live preview, insert as SVG with alt text, edit keeps scale/position/rotation, inline errors (`hosts/onlyoffice/tests/e2e.js`). |
 | Helper | Linux | Token required (401), foreign Host header rejected (403), CORS/PNA preflight answered. |
 

@@ -10,7 +10,7 @@
         <prop oor:name="Title" oor:type="xs:string"><value xml:lang="en-US">LaTeX Equation (LavaTeX)...</value></prop>
         <prop oor:name="Target" oor:type="xs:string"><value>_self</value></prop>
         <prop oor:name="Context" oor:type="xs:string"><value>com.sun.star.presentation.PresentationDocument,com.sun.star.drawing.DrawingDocument</value></prop>
-        <prop oor:name="ImageIdentifier" oor:type="xs:string"><value>%origin%/icons/lavatex_16.png</value></prop>
+        <prop oor:name="ImageIdentifier" oor:type="xs:string"><value>%origin%/icons/lavatex</value></prop>
       </node>
     </node>
     <!-- Insert > LaTeX Equation..., right after Insert > Image -->
@@ -47,7 +47,7 @@
             <node oor:name="B1" oor:op="replace">
               <prop oor:name="URL"><value>service:org.lavatex.LibreOffice?equation</value></prop>
               <prop oor:name="Title"><value xml:lang="en-US">LaTeX Equation (insert or edit)</value></prop>
-              <prop oor:name="ImageIdentifier"><value>%origin%/icons/lavatex_26.png</value></prop>
+              <prop oor:name="ImageIdentifier"><value>%origin%/icons/lavatex</value></prop>
               <prop oor:name="Target"><value>_self</value></prop>
               <prop oor:name="Context"><value/></prop>
             </node>
@@ -55,11 +55,25 @@
         </node>
       </node>
     </node>
+    <!-- Tabbed ("ribbon") interface: Extension tab -->
+    <node oor:name="OfficeNotebookBar">
+      <node oor:name="org.lavatex.libreoffice.notebookbar" oor:op="replace">
+        <node oor:name="N1" oor:op="replace">
+          <prop oor:name="URL" oor:type="xs:string"><value>service:org.lavatex.LibreOffice?equation</value></prop>
+          <prop oor:name="Title" oor:type="xs:string"><value xml:lang="en-US">LaTeX Equation</value></prop>
+          <prop oor:name="ImageIdentifier" oor:type="xs:string"><value>%origin%/icons/lavatex</value></prop>
+          <prop oor:name="Target" oor:type="xs:string"><value>_self</value></prop>
+          <prop oor:name="Context" oor:type="xs:string"><value>com.sun.star.presentation.PresentationDocument,com.sun.star.drawing.DrawingDocument</value></prop>
+          <prop oor:name="ControlType" oor:type="xs:string"><value>ImageButton</value></prop>
+          <prop oor:name="Style" oor:type="xs:string"><value>text+icon</value></prop>
+        </node>
+      </node>
+    </node>
     <node oor:name="Images">
       <node oor:name="org.lavatex.libreoffice.image" oor:op="replace">
         <prop oor:name="URL"><value>service:org.lavatex.LibreOffice?equation</value></prop>
         <node oor:name="UserDefinedImages">
-          <prop oor:name="ImageSmallURL"><value>%origin%/icons/lavatex_16.png</value></prop>
+          <prop oor:name="ImageSmallURL"><value>%origin%/icons/lavatex</value></prop>
           <prop oor:name="ImageBigURL"><value>%origin%/icons/lavatex_26.png</value></prop>
         </node>
       </node>

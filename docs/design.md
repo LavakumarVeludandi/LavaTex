@@ -71,7 +71,6 @@ Error messages are mapped to plain language and to a line in the user's source o
 
 ## Known limitations (0.1.0)
 
-- In LibreOffice, the standard-toolbar button shows a text label instead of the icon.
 - ONLYOFFICE older than 10.0 inserts equations but can't store their source (the plugin warns). It can't place PDF pictures, so PDF falls back to SVG there.
 - Tectonic's PDF output compresses the info dictionary, so the source lives in alt text only for Tectonic PDFs.
 - Inline equations inside text boxes, with baseline alignment, are out of scope. `depthBp` is recorded for a future version.
