@@ -32,6 +32,15 @@ ONLYOFFICE plugins run in a sandboxed iframe and cannot start programs. Renderin
 
 A browser-only renderer (MathJax) is a possible later option for zero-install use, but it can't run arbitrary packages, so it isn't the default.
 
+## Accepted input
+
+`normalize.rs` unwraps what users type before it is typeset:
+- a full IguanaTeX-style document: its preamble is used and `\documentclass` is dropped;
+- `$…$`, `\(…\)`, `\[…\]` and `$$…$$` around a single formula;
+- display environments, which are mapped to their inline-safe amsmath forms (`align*` becomes `aligned`).
+
+Error line numbers are mapped back to the text as typed, and the metadata stores the source unchanged.
+
 ## Rendering pipeline
 
 The equation is typeset at 10 pt inside an `lrbox` and measured, so the box's width, height and depth are exact and the baseline is known. The page is then sized to the box, and the result is scaled to the requested font size. This is the IguanaTeX approach, and it works for any font setup.
@@ -56,6 +65,7 @@ Error messages are mapped to plain language and to a line in the user's source o
 
 - **Scale, not box size, is preserved.** On edit, the new picture is sized `newRenderedSize × (currentWidth / previousRenderedWidth)`, so a longer equation grows instead of being squashed.
 - The top-left position and rotation are kept, and the replacement is a single undo step in LibreOffice.
+- If LibreOffice refuses an SVG or PDF picture (for example, a build without PDF import), the half-inserted shape is removed, a 600 dpi PNG is inserted instead, and the user is told why.
 - Metadata from a document is treated as untrusted. Nothing is compiled when a file opens. The dialog notes when an equation brings its own preamble.
 
 ## Decisions on the SDD's open questions
@@ -71,7 +81,6 @@ Error messages are mapped to plain language and to a line in the user's source o
 
 ## Known limitations (0.1.0)
 
-- In LibreOffice, the standard-toolbar button shows a text label instead of the icon.
 - ONLYOFFICE older than 10.0 inserts equations but can't store their source (the plugin warns). It can't place PDF pictures, so PDF falls back to SVG there.
 - Tectonic's PDF output compresses the info dictionary, so the source lives in alt text only for Tectonic PDFs.
 - Inline equations inside text boxes, with baseline alignment, are out of scope. `depthBp` is recorded for a future version.

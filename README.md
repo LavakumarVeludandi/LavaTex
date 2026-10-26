@@ -44,6 +44,26 @@ Version 0.1.0, the first working build.
 
 See [docs/installation.md](docs/installation.md) for details and troubleshooting.
 
+## Writing equations
+
+Type just the math, e.g. `\frac{a}{b}`; LavaTeX adds the document around it.
+
+For **several lines**, end each line with `\\`. Lines are centred, or lined up at `&` if you use it:
+
+```latex
+f(x) &= (x+1)^2 \\
+     &= x^2 + 2x + 1
+```
+
+As in LaTeX, a line break in the source without `\\` does not start a new line.
+
+Habits from IguanaTeX and LaTeX work too:
+
+- your own delimiters: `$…$` (inline), `\[…\]` or `$$…$$` (display);
+- display environments: `equation`, `align`, `gather`, `multline` and their starred forms. On a slide these become `aligned`/`gathered`, with no equation numbers;
+- several display blocks in a row (`\[…\]`, `align*`, …), which are stacked one above the other;
+- a complete IguanaTeX-style document (`\documentclass … \begin{document} … \end{document}`). Its preamble is used, and the whole document is kept as the editable source.
+
 ## Command line
 
 ```console

@@ -6,6 +6,7 @@
 //! no shell interpolation and a hard timeout.
 
 use crate::metadata::{self, EquationMeta};
+use crate::normalize;
 use crate::toolchain::{self, Distribution, Engine, Toolchain};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -383,11 +384,12 @@ fn wrapper(req: &RenderRequest, plan: &Plan, meta_hex: Option<&str>) -> (String,
     ));
 
     let source = match req.mode {
-        // Blank lines end a paragraph, which is never valid inside math.
+        // Blank lines end a paragraph, which is never valid inside math; turn
+        // them into comments so line numbers still match the user's source.
         Mode::Display | Mode::Inline => req
             .source
             .lines()
-            .filter(|l| !l.trim().is_empty())
+            .map(|l| if l.trim().is_empty() { "%" } else { l })
             .collect::<Vec<_>>()
             .join("\n"),
         Mode::Text => req.source.clone(),
@@ -733,6 +735,24 @@ pub fn render_with(req: &RenderRequest, tc: &Toolchain) -> Result<RenderOutput, 
     }
     let plan = plan(tc, engine, req.format)?;
     let timeout = Duration::from_secs(req.timeout_secs.clamp(1, 120));
+    // What is actually typeset: the user's text with any IguanaTeX-style
+    // document wrapper or math delimiters unwrapped. Metadata keeps the
+    // source exactly as typed.
+    let norm = normalize::normalize(&req.source, req.mode);
+    let mut preamble = norm
+        .preamble
+        .clone()
+        .or_else(|| req.preamble.clone())
+        .unwrap_or_else(|| DEFAULT_PREAMBLE.to_string());
+    if norm.needs_amsmath && !preamble.contains("amsmath") && !preamble.contains("mathtools") {
+        preamble.push_str("\n\\usepackage{amsmath}");
+    }
+    let typeset = RenderRequest {
+        source: norm.body.clone(),
+        preamble: Some(preamble),
+        mode: norm.mode,
+        ..req.clone()
+    };
     let ws = Workspace::new()?;
     let factor = req.font_size / BASE_FONT_PT;
     let generator = format!("LavaTeX {}", crate::VERSION);
@@ -758,7 +778,7 @@ pub fn render_with(req: &RenderRequest, tc: &Toolchain) -> Result<RenderOutput, 
     // The size is only known after compiling; PDF info is written during the
     // compile, so for PDF we compile once to measure and once to embed.
     let compile = |meta_hex: Option<&str>| -> Result<(f64, f64, f64), RenderError> {
-        let (tex, preamble_line, source_line) = wrapper(req, &plan, meta_hex);
+        let (tex, preamble_line, source_line) = wrapper(&typeset, &plan, meta_hex);
         std::fs::write(ws.path("eq.tex"), tex)
             .map_err(|e| RenderError::new(ErrorKind::Tool, e.to_string()))?;
         let args = tex_args(tc, &plan);
@@ -770,7 +790,18 @@ pub fn render_with(req: &RenderRequest, tc: &Toolchain) -> Result<RenderOutput, 
             Intermediate::Pdf => ws.path("eq.pdf"),
         };
         if !ok || !produced.is_file() {
-            let mut err = parse_tex_error(&log, tc, req, preamble_line, source_line);
+            let mut err = parse_tex_error(&log, tc, &typeset, preamble_line, source_line);
+            // Map back to the line the user typed.
+            match (err.location, err.line) {
+                (Some("source"), Some(l)) => err.line = Some(l + norm.body_line_offset),
+                (Some("preamble"), Some(l)) => {
+                    if let Some(offset) = norm.preamble_source_offset {
+                        err.location = Some("source");
+                        err.line = Some(l + offset);
+                    }
+                }
+                _ => {}
+            }
             if err.details.is_empty() {
                 err.details = last_lines(&console, 30);
             }
@@ -1047,7 +1078,8 @@ mod tests {
         let (tex, _, src_line) = wrapper(&req, &plan, None);
         let lines: Vec<&str> = tex.lines().collect();
         assert_eq!(lines[src_line - 1], "a");
-        assert_eq!(lines[src_line], "= b");
+        assert_eq!(lines[src_line], "%");
+        assert_eq!(lines[src_line + 1], "= b");
         assert!(tex.contains("\\displaystyle"));
     }
 

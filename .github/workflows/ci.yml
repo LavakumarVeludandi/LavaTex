@@ -2,39 +2,47 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   core:
-    name: Core (${{ matrix.target }})
+    name: Core (${{ matrix.tag }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, tag: linux-x86_64 }
-          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, tag: linux-aarch64 }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, tag: windows-x86_64 }
-          - { os: macos-13, target: x86_64-apple-darwin, tag: macos-x86_64 }
-          - { os: macos-14, target: aarch64-apple-darwin, tag: macos-aarch64 }
+          # Linux binaries are static (musl) so they run on any distribution.
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, tag: linux-x86_64, test: true }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, tag: linux-aarch64, test: true }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, tag: windows-x86_64, test: true }
+          - { os: macos-latest, target: aarch64-apple-darwin, tag: macos-aarch64, test: true }
+          # Intel Macs: cross-compiled on Apple silicon.
+          - { os: macos-latest, target: x86_64-apple-darwin, tag: macos-x86_64, test: false }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
+          targets: ${{ matrix.target }}
           components: clippy, rustfmt
-      - run: cargo fmt --all --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo test --all
+      - if: matrix.test
+        run: cargo fmt --all --check
+      - if: matrix.test
+        run: cargo clippy --all-targets -- -D warnings
+      - if: matrix.test
+        run: cargo test --all
       - run: cargo build --release --target ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         with:
           name: lavatex-${{ matrix.tag }}
           path: target/${{ matrix.target }}/release/lavatex${{ runner.os == 'Windows' && '.exe' || '' }}
+          if-no-files-found: error
 
   integration:
     name: Integration (TeX Live + LibreOffice + Chromium)
@@ -78,12 +86,14 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: bins
-      - name: Build .oxt (per platform and multi) and ONLYOFFICE .plugin
+      - name: Build .oxt (multi-platform and per platform), ONLYOFFICE .plugin and CLI archives
         run: |
+          set -euo pipefail
           args=()
           for dir in bins/lavatex-*; do
             tag=${dir#bins/lavatex-}
             exe=$(ls "$dir"/lavatex* | head -n1)
+            chmod +x "$exe"
             python3 tools/package.py libreoffice --bin "$tag=$exe"
             args+=(--bin "$tag=$exe")
           done
@@ -98,3 +108,33 @@ jobs:
         with:
           name: lavatex-packages
           path: dist/*
+
+  release:
+    name: GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: lavatex-packages
+          path: dist
+      - name: Release notes from CHANGELOG.md
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          awk -v v="$version" '
+            /^## / { if (found) exit; if (index($0, "[" v "]")) { found=1; next } }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          test -s release-notes.md || { echo "No CHANGELOG.md section for $version"; exit 1; }
+          cat release-notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: LavaTeX ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: |
+            dist/lavatex-libreoffice-*.oxt
+            dist/lavatex-cli-*.zip

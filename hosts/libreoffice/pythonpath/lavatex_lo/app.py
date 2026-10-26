@@ -44,7 +44,8 @@ def run(ctx):
         toolchains = []
 
     window = doc.getCurrentController().getFrame().getContainerWindow()
-    result, options = EquationDialog(ctx, window, core, settings, toolchains, record).run()
+    pdf_ok = shapes.supports_pdf_pictures(ctx, core)
+    result, options = EquationDialog(ctx, window, core, settings, toolchains, record, pdf_supported=pdf_ok).run()
 
     # Remember choices for next time, and share TeX/engine/format with other hosts.
     changed_shared = any(options[k] != settings.get(k) for k in ("toolchain", "engine", "format"))
@@ -57,4 +58,43 @@ def run(ctx):
             pass
 
     if result:
+        _place_with_fallback(ctx, doc, core, result, existing, options)
+
+
+def _place_with_fallback(ctx, doc, core, result, existing, options):
+    """Place the picture; if LibreOffice rejects a vector picture, insert a
+    high-resolution PNG instead and say why."""
+    try:
         shapes.place(ctx, doc, result, existing=existing)
+        return
+    except shapes.PlacementError as exc:
+        failure = exc
+    fmt = result.get("format", "svg")
+    if fmt != "png":
+        meta = result["meta"]
+        request = {}
+        if options.get("toolchain"):
+            request["toolchain"] = options["toolchain"]
+        request.update({
+            "source": meta["source"], "preamble": meta.get("preamble"), "mode": meta.get("mode", "display"),
+            "fontSize": meta.get("fontSize", 20), "color": meta.get("color", "#000000"),
+            "format": "png", "pngDpi": 600,
+        })
+        if meta.get("engine"):
+            request["engine"] = meta["engine"]
+        try:
+            png = core.render(request)
+        except BridgeError:
+            png = None
+        if png and png.get("ok"):
+            try:
+                shapes.place(ctx, doc, png, existing=existing)
+                _message(ctx, doc,
+                         "LibreOffice could not place the %s picture, so LavaTeX inserted a high-resolution PNG "
+                         "instead (it is still editable).\n\nLibreOffice said: %s %s\n\nPlease report this "
+                         "together with your LibreOffice version." % (fmt.upper(), failure.summary, failure.details),
+                         "WARNINGBOX")
+                return
+            except shapes.PlacementError as exc:
+                failure = exc
+    _message(ctx, doc, "The equation could not be inserted.\n\n%s\n%s" % (failure.summary, failure.details))
