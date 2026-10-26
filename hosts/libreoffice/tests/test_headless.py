@@ -179,6 +179,12 @@ def main():
             app._message = real_message
             doc.close(True)
 
+        # PDF picture support is probed, not assumed (Fedora's build lacks it).
+        from lavatex_lo.dialog import available_formats
+
+        check(shapes.supports_pdf_pictures(ctx, core) in (True, False), "PDF picture support probed: %s" % shapes._pdf_support)
+        check([f for f, _ in available_formats(False)] == ["svg", "png"], "PDF hidden when unsupported")
+
         # IguanaTeX-style input: a whole document pasted into the source box.
         doc = desktop.loadComponentFromURL("private:factory/simpress", "_blank", 0, (prop("Hidden", True),))
         iguana = "\\documentclass{article}\n\\usepackage{amsmath}\n\\begin{document}\n$\\displaystyle \\int_0^1 x\\,dx$\n\\end{document}"

@@ -182,6 +182,46 @@ def load_graphic(ctx, path):
                          "; ".join(errors))
 
 
+def _tiny_pdf():
+    """A minimal valid one-page PDF, used to probe for PDF picture support."""
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 10 10] /Contents 4 0 R >>",
+        b"<< /Length 14 >>\nstream\n0 0 m 10 10 l S\nendstream",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for i, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + body + b"\nendobj\n"
+    xref = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    for off in offsets:
+        out += b"%010d 00000 n \n" % off
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
+    return bytes(out)
+
+
+_pdf_support = None
+
+
+def supports_pdf_pictures(ctx, core):
+    """Whether this LibreOffice build can display PDF files as pictures. Some
+    distributions (e.g. Fedora) build LibreOffice without PDF picture import."""
+    global _pdf_support
+    if _pdf_support is None:
+        path = core.scratch_path("pdf")
+        try:
+            with open(path, "wb") as fh:
+                fh.write(_tiny_pdf())
+            load_graphic(ctx, path)
+            _pdf_support = True
+        except (PlacementError, OSError):
+            _pdf_support = False
+    return _pdf_support
+
+
 def _assign_graphic(shape, graphic):
     try:
         shape.Graphic = graphic

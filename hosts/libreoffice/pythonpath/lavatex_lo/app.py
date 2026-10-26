@@ -44,7 +44,8 @@ def run(ctx):
         toolchains = []
 
     window = doc.getCurrentController().getFrame().getContainerWindow()
-    result, options = EquationDialog(ctx, window, core, settings, toolchains, record).run()
+    pdf_ok = shapes.supports_pdf_pictures(ctx, core)
+    result, options = EquationDialog(ctx, window, core, settings, toolchains, record, pdf_supported=pdf_ok).run()
 
     # Remember choices for next time, and share TeX/engine/format with other hosts.
     changed_shared = any(options[k] != settings.get(k) for k in ("toolchain", "engine", "format"))

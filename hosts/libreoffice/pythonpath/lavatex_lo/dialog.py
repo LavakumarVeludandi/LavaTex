@@ -10,6 +10,10 @@ from .bridge import BridgeError
 
 MODES = [("display", "Display"), ("inline", "Inline"), ("text", "Text (raw LaTeX)")]
 FORMATS = [("svg", "SVG (vector, recommended)"), ("pdf", "PDF (vector)"), ("png", "PNG (bitmap)")]
+
+
+def available_formats(pdf_supported):
+    return [f for f in FORMATS if f[0] != "pdf" or pdf_supported]
 ENGINES = ["", "latex", "pdflatex", "xelatex", "lualatex", "tectonic"]
 
 W = 400  # dialog width in app-font units
@@ -28,12 +32,13 @@ class _Action(unohelper.Base, XActionListener):
 
 
 class EquationDialog:
-    def __init__(self, ctx, parent_window, core, settings, toolchains, record=None):
+    def __init__(self, ctx, parent_window, core, settings, toolchains, record=None, pdf_supported=True):
         self.ctx = ctx
         self.core = core
         self.settings = settings
         self.toolchains = toolchains
         self.record = record
+        self.formats = available_formats(pdf_supported)
         self.result = None
         self.error = None
         self._cache_key = None
@@ -77,7 +82,7 @@ class EquationDialog:
         self._add("FixedText", "lblColor", 180, y + 2, 24, 9, Label="~Color")
         self._add("Edit", "color", 204, y, 40, 12, HelpText="#RRGGBB")
         self._add("FixedText", "lblFormat", 252, y + 2, 28, 9, Label="~Output")
-        self._add("ListBox", "format", 280, y, 114, 12, Dropdown=True, StringItemList=tuple(l for _, l in FORMATS))
+        self._add("ListBox", "format", 280, y, 114, 12, Dropdown=True, StringItemList=tuple(l for _, l in self.formats))
 
         y = 156
         self._add("FixedText", "lblTex", M, y + 2, 26, 9, Label="~TeX")
@@ -112,7 +117,8 @@ class EquationDialog:
         self._select("mode", [m for m, _ in MODES], r.get("mode", s["mode"]))
         self._ctl("size").setValue(float(r.get("fontSize", s["fontSize"])))
         self._ctl("color").setText(r.get("color", s["color"]))
-        self._select("format", [f for f, _ in FORMATS], r.get("format", s["format"]))
+        wanted_format = r.get("format", s["format"])
+        self._select("format", [f for f, _ in self.formats], wanted_format)
         self._select("engine", ENGINES, r.get("engine", s["engine"]) if r.get("engine") in ENGINES else s["engine"])
         self._ctl("dpi").setValue(float(s["pngDpi"]))
         self._fill_toolchains(s["toolchain"])
@@ -121,12 +127,18 @@ class EquationDialog:
                          ("details", self.on_details), ("browse", self.on_browse)):
             self._ctl(name).addActionListener(_Action(fn))
 
+        # Notices stay visible above every later status message.
+        notices = []
         if not self.toolchains:
-            self._status("No TeX installation was found. Install TeX Live, MiKTeX, MacTeX or Tectonic, "
-                         "or choose the folder that contains latex with Folder...")
-        elif self.record and self.record.get("preamble", "") != s["preamble"]:
-            self._status("This equation carries its own preamble from the document. Review it before rendering "
-                         "if the file came from someone else.")
+            notices.append("No TeX installation was found. Install TeX Live, MiKTeX, MacTeX or Tectonic, "
+                           "or choose the folder that contains latex with Folder...")
+        if self.record and self.record.get("preamble", "") != s["preamble"]:
+            notices.append("This equation carries its own preamble from the document; review it if the file "
+                           "came from someone else.")
+        if wanted_format == "pdf" and not any(f == "pdf" for f, _ in self.formats):
+            notices.append("This LibreOffice cannot display PDF pictures, so SVG (also vector) is used.")
+        self._notice = " ".join(notices)
+        self._status("")
         if self.record:
             self.on_preview()
 
@@ -155,7 +167,8 @@ class EquationDialog:
     # --- behaviour --------------------------------------------------------
 
     def _status(self, text, details=""):
-        self.model.getByName("status").Label = text
+        notice = getattr(self, "_notice", "")
+        self.model.getByName("status").Label = (notice + "\n" + text).strip() if notice else text
         self._details = details
         self.model.getByName("details").Enabled = bool(details)
 
@@ -164,7 +177,7 @@ class EquationDialog:
             "mode": MODES[max(0, self._ctl("mode").getSelectedItemPos())][0],
             "fontSize": float(self._ctl("size").getValue()),
             "color": self._ctl("color").getText().strip() or "#000000",
-            "format": FORMATS[max(0, self._ctl("format").getSelectedItemPos())][0],
+            "format": self.formats[max(0, self._ctl("format").getSelectedItemPos())][0],
             "pngDpi": int(self._ctl("dpi").getValue()),
             "preamble": self._ctl("preamble").getText(),
             "toolchain": self.toolchain_ids[max(0, self._ctl("toolchain").getSelectedItemPos())],
