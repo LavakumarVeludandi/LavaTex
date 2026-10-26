@@ -1,0 +1,17 @@
+{
+  "altText": "\\int_0^1 x^2\\,dx = \\tfrac{1}{3} \\quad \\text{Größe ✓}\n\nlavatex:1:eyJzY2hlbWEiOiJsYXZhdGV4LWVxdWF0aW9uLzEiLCJzb3VyY2UiOiJcXGludF8wXjEgeF4yXFwsZHggPSBcXHRmcmFjezF9ezN9IFxccXVhZCBcXHRleHR7R3LDtsOfZSDinJN9IiwicHJlYW1ibGUiOiJcXHVzZXBhY2thZ2V7YW1zbWF0aH1cblxcdXNlcGFja2FnZXthbXNzeW1ifSIsIm1vZGUiOiJkaXNwbGF5IiwiZm9udFNpemUiOjI0LjAsImNvbG9yIjoiIzFhNGY5YyIsImZvcm1hdCI6InN2ZyIsImVuZ2luZSI6ImxhdGV4Iiwid2lkdGhCcCI6MTIwLjUsImhlaWdodEJwIjozMC4yNSwiZGVwdGhCcCI6OC4wLCJnZW5lcmF0b3IiOiJMYXZhVGVYIGZpeHR1cmUifQ",
+  "meta": {
+    "color": "#1a4f9c",
+    "depthBp": 8.0,
+    "engine": "latex",
+    "fontSize": 24.0,
+    "format": "svg",
+    "generator": "LavaTeX fixture",
+    "heightBp": 30.25,
+    "mode": "display",
+    "preamble": "\\usepackage{amsmath}\n\\usepackage{amssymb}",
+    "schema": "lavatex-equation/1",
+    "source": "\\int_0^1 x^2\\,dx = \\tfrac{1}{3} \\quad \\text{Größe ✓}",
+    "widthBp": 120.5
+  }
+}

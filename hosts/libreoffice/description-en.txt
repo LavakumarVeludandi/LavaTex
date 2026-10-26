@@ -1,0 +1,1 @@
+LavaTeX inserts LaTeX equations into Impress and Draw as ordinary SVG, PDF or PNG pictures, using the TeX installation you already have (TeX Live, MiKTeX, MacTeX or Tectonic). The LaTeX source travels with the picture, so you can select it later and edit it, even after saving as PPTX or opening the file in another application that has LavaTeX.

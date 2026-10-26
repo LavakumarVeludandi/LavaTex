@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="lava" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff7a2f"/>
+      <stop offset="1" stop-color="#d6331a"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="2" width="60" height="60" rx="13" fill="url(#lava)"/>
+  <path d="M19 15h28v7h-2.5c-.6-3-1.8-4.2-5-4.2H29l9.6 12.6L28.4 44.2h11.4c3.6 0 5.2-1.5 6-5h2.6L46.6 49H18v-2.2l12.5-15.6L19 17.2z" fill="#fff"/>
+</svg>

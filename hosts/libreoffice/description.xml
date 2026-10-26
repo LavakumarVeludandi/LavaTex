@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<description xmlns="http://openoffice.org/extensions/description/2006"
+             xmlns:xlink="http://www.w3.org/1999/xlink"
+             xmlns:d="http://openoffice.org/extensions/description/2006"
+             xmlns:lo="http://libreoffice.org/extensions/description/2011">
+  <identifier value="org.lavatex.libreoffice"/>
+  <version value="0.1.0"/>
+  <platform value="all"/>
+  <dependencies>
+    <lo:LibreOffice-minimal-version value="7.0" d:name="LibreOffice 7.0"/>
+  </dependencies>
+  <publisher>
+    <name xlink:href="https://github.com/lavakumarveludandi/lavatex" lang="en">LavaTeX contributors</name>
+  </publisher>
+  <display-name>
+    <name lang="en">LavaTeX</name>
+  </display-name>
+  <icon>
+    <default xlink:href="icons/lavatex.png"/>
+  </icon>
+  <extension-description>
+    <src lang="en" xlink:href="description-en.txt"/>
+  </extension-description>
+  <registration>
+    <simple-license accept-by="admin" suppress-on-update="true">
+      <license-text xlink:href="LICENSE.txt" lang="en"/>
+    </simple-license>
+  </registration>
+</description>
