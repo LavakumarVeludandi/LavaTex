@@ -238,7 +238,8 @@ class EquationDialog:
         px_w = result["widthBp"] * 96.0 / 72.0
         px_h = result["heightBp"] * 96.0 / 72.0
         preview = self.model.getByName("preview")
-        preview.ScaleImage = px_w > box.Width - 4 or px_h > box.Height - 4
+        # Margin: the control's border and LibreOffice's own padding take space.
+        preview.ScaleImage = px_w > box.Width * 0.9 or px_h > box.Height * 0.85
         preview.ImageURL = uno.systemPathToFileUrl(result["path"])
 
     def _focus_line(self, line):

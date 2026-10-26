@@ -41,7 +41,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: lavatex-${{ matrix.tag }}
-          path: target/${{ matrix.target }}/release/lavatex${{ runner.os == 'Windows' && '.exe' || '' }}
+          # lavatex-helper is the windowless helper that ONLYOFFICE uses.
+          path: |
+            target/${{ matrix.target }}/release/lavatex${{ runner.os == 'Windows' && '.exe' || '' }}
+            target/${{ matrix.target }}/release/lavatex-helper${{ runner.os == 'Windows' && '.exe' || '' }}
           if-no-files-found: error
 
   integration:
@@ -92,7 +95,9 @@ jobs:
           args=()
           for dir in bins/lavatex-*; do
             tag=${dir#bins/lavatex-}
-            exe=$(ls "$dir"/lavatex* | head -n1)
+            # The extension only needs the main program, not lavatex-helper.
+            exe="$dir/lavatex"
+            [ -f "$exe" ] || exe="$dir/lavatex.exe"
             chmod +x "$exe"
             python3 tools/package.py libreoffice --bin "$tag=$exe"
             args+=(--bin "$tag=$exe")
@@ -101,7 +106,8 @@ jobs:
           python3 tools/package.py onlyoffice
           for dir in bins/lavatex-*; do
             tag=${dir#bins/lavatex-}
-            (cd "$dir" && zip -q "../../dist/lavatex-cli-$tag.zip" lavatex*)
+            chmod +x "$dir"/lavatex*
+            (cd "$dir" && zip -q "../../dist/lavatex-$tag.zip" lavatex*)
           done
           ls -la dist
       - uses: actions/upload-artifact@v4
@@ -138,4 +144,4 @@ jobs:
           files: |
             dist/lavatex-libreoffice-*.oxt
             dist/lavatex-onlyoffice-*.plugin
-            dist/lavatex-cli-*.zip
+            dist/lavatex-*.zip

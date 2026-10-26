@@ -18,9 +18,9 @@ LavaTeX compiles LaTeX, which is a programming language. The main risks are:
 - **Helper (`lavatex serve`):**
   - loopback only;
   - Host-header allow-list against DNS rebinding;
-  - random bearer token stored with owner-only permissions, compared in constant time;
+  - random bearer token stored with owner-only permissions, compared in constant time; `lavatex setup onlyoffice` also writes it, owner-only, into the plugin's own folder so the plugin can pair;
   - request bodies capped at 512 KiB;
-  - no endpoints that read files or run anything other than the renderer.
+  - no endpoints that read files or run anything other than the renderer; `/v1/shutdown` (token required) only stops the helper.
 
 Custom preambles and packages extend what LaTeX can do. Packages from CTAN are as trusted as your TeX installation.
 

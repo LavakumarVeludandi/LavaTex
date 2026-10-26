@@ -6,10 +6,22 @@
 
 Tested in ONLYOFFICE Desktop Editors 10.0.
 
+- **One-time setup, then it just works:** `lavatex setup onlyoffice` installs the plugin into ONLYOFFICE, installs LavaTeX for your user, and makes its helper start by itself when you log in. The plugin finds the helper on its own, so there is no server to start and no token to copy. `lavatex setup onlyoffice --uninstall` removes everything.
+- New `lavatex-helper` program: the helper without a console window. On Linux with systemd it only runs while ONLYOFFICE uses it (socket activation), and exits when idle.
+- If the helper isn't running, the plugin explains the one-time setup and offers **Try again**, instead of asking for an address and token.
+- The CLI download is now `lavatex-<platform>.zip` and contains `lavatex` and `lavatex-helper`.
 - **Works offline:** the plugin now uses the copy of ONLYOFFICE's plugin SDK that ships with ONLYOFFICE. It used to download it from the internet, and failed to start when that site couldn't be reached.
 - Fixed the equation editor showing underneath the "connect to your TeX installation" screen.
-- The release now includes `lavatex-onlyoffice-<version>.plugin`. Install it with *Plugins › Plugin Manager › Install plugin manually*.
+- The release also includes `lavatex-onlyoffice-<version>.plugin`, for installing the plugin by hand (for example on Document Server).
 - Equations made in LibreOffice and saved as PPTX can be edited in ONLYOFFICE.
+
+### Documentation
+
+- New [installation](docs/installation.md) and [usage](docs/usage.md) guides with screenshots.
+
+### LibreOffice
+
+- The dialog preview no longer crops tall (multi-line) equations.
 
 ## [0.1.0] - 2026-10-26
 

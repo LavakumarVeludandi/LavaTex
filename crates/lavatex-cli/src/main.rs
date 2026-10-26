@@ -1,9 +1,7 @@
 //! `lavatex` — command-line front end and local render helper.
 
-mod serve;
-
-use base64::Engine as _;
 use clap::{Parser, Subcommand};
+use lavatex_cli::{apply_config, serve, setup};
 use lavatex_core::config::Config;
 use lavatex_core::render::{self, RenderRequest};
 use lavatex_core::{metadata, toolchain, Engine, Format, Mode};
@@ -57,7 +55,12 @@ enum Cmd {
         /// Use this token instead of the stored one.
         #[arg(long, env = "LAVATEX_TOKEN")]
         token: Option<String>,
+        /// Exit after this many seconds without requests (0 = never).
+        #[arg(long, default_value_t = 0)]
+        idle_exit: u64,
     },
+    /// One-time setup of a host application (currently: onlyoffice).
+    Setup(setup::SetupArgs),
 }
 
 #[derive(clap::Args)]
@@ -106,16 +109,6 @@ fn read_path(path: &PathBuf) -> std::io::Result<String> {
         Ok(s)
     } else {
         std::fs::read_to_string(path)
-    }
-}
-
-/// Fill in unset choices from the shared config file.
-pub fn apply_config(req: &mut RenderRequest, config: &Config) {
-    if req.toolchain.as_deref().map_or(true, |t| t.is_empty()) && !config.toolchain.is_empty() {
-        req.toolchain = Some(config.toolchain.clone());
-    }
-    if req.engine.is_none() {
-        req.engine = Engine::parse(&config.engine);
     }
 }
 
@@ -335,12 +328,6 @@ fn cmd_config(
     ExitCode::SUCCESS
 }
 
-pub fn new_token() -> String {
-    let mut bytes = [0u8; 24];
-    getrandom::getrandom(&mut bytes).expect("OS random number generator");
-    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
-}
-
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
@@ -352,7 +339,7 @@ fn main() -> ExitCode {
             engine,
             format,
         } => cmd_config(toolchain, engine, format),
-        Cmd::Token => match lavatex_core::config::load_or_create_token(new_token) {
+        Cmd::Token => match lavatex_core::config::load_or_create_token(lavatex_cli::new_token) {
             Ok(t) => {
                 println!("{t}");
                 ExitCode::SUCCESS
@@ -362,6 +349,11 @@ fn main() -> ExitCode {
                 ExitCode::from(1)
             }
         },
-        Cmd::Serve { port, token } => serve::run(port, token),
+        Cmd::Serve {
+            port,
+            token,
+            idle_exit,
+        } => serve::run(port, token, Some(idle_exit)),
+        Cmd::Setup(args) => setup::run(args),
     }
 }

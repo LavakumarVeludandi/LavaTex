@@ -116,6 +116,8 @@ pre#details {
 }
 
 .setup h2 { font-size: 14px; margin: 0 0 6px; }
+.setup a { color: var(--accent); }
+.setup .advanced { margin-top: 10px; }
 .setup ol { padding-left: 18px; margin: 6px 0; }
 .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
 .row label { width: 110px; }

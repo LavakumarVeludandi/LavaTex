@@ -15,7 +15,8 @@ This document updates *LavaTeX Software Design Document v0.1* with the decisions
 |---|---|---|
 | `lavatex-core` | Rust library | TeX discovery, render pipelines, sandboxing, error mapping, metadata embedding and extraction |
 | `lavatex` CLI | Rust binary | `detect`, `render` (JSON in/out for hosts), `inspect`, `config`, `token`, `serve` |
-| `lavatex serve` | Rust, `tiny_http` | Localhost HTTP helper for browser-based hosts |
+| `lavatex serve` / `lavatex-helper` | Rust, `tiny_http` | Localhost HTTP helper for browser-based hosts. `lavatex-helper` is the same server without a console window, for autostart. |
+| `lavatex setup onlyoffice` | Rust | Installs the embedded plugin, the programs and the helper's autostart, and pairs plugin and helper |
 | LibreOffice extension | Python UNO + bundled `lavatex` | Dialog, insert/replace `GraphicObjectShape`, metadata on shapes |
 | ONLYOFFICE plugin | HTML/JS | Dialog with live preview, insert/replace through the Builder API, alt-text metadata |
 | `scripts/lavatex-core.js` | Plain JS (UMD) | Alt-text parsing, sizing, helper client; reusable by a future Office.js add-in |
@@ -39,7 +40,20 @@ ONLYOFFICE plugins run in a sandboxed iframe and cannot start programs. Renderin
 - answers CORS and Chrome Private Network Access preflights;
 - limits request size and uses the same sandboxed renderer as the CLI.
 
-A browser-only renderer (MathJax) is a possible later option for zero-install use, but it can't run arbitrary packages, so it isn't the default.
+ONLYOFFICE does allow some plugins to start processes, but only plugins on a fixed internal list, so a third-party plugin can't use it.
+
+#### Setup and autostart
+
+Users should not have to start a server. `lavatex setup onlyoffice` does it once:
+
+1. copies `lavatex` and `lavatex-helper` to a per-user folder;
+2. installs the plugin (embedded in the binary at build time) into every ONLYOFFICE user plugin folder it finds (native, Flatpak, Snap on Linux; the per-user folders on Windows and macOS), plus `lavatex-helper.json` containing the helper URL and token (mode `0600`);
+3. registers autostart: a systemd user socket where available, so the helper is started on the first request and exits after 15 minutes idle; otherwise an XDG autostart entry (Linux), a LaunchAgent (macOS) or an HKCU *Run* value (Windows);
+4. stops any helper from an earlier setup (`POST /v1/shutdown`), starts the new one and checks it answers with the paired token.
+
+The plugin reads `lavatex-helper.json` from its own folder, so it connects without asking the user anything. Manual URL and token entry remain under *Advanced* for Document Server.
+
+We chose this over a browser-only renderer (MathJax): like IguanaTeX, LavaTeX renders with the user's own TeX, so any package and the same output as in LibreOffice are available.
 
 ## Accepted input
 
@@ -81,7 +95,7 @@ Error messages are mapped to plain language and to a line in the user's source o
 
 | SDD open decision | Decision |
 |---|---|
-| Full LaTeX in ONLYOFFICE | Local helper (`lavatex serve`) using the user's TeX. MathJax may be added later as an optional zero-install mode. |
+| Full LaTeX in ONLYOFFICE | Local helper using the user's TeX, installed and auto-started by `lavatex setup onlyoffice`. No MathJax. |
 | Primary TeX engine | The user's choice. Auto order: latex+dvisvgm (TeX Live → MacTeX → MiKTeX) → others → Tectonic. |
 | SVG conversion | dvisvgm `--no-fonts` primarily; pdftocairo for PDF-only engines. |
 | Metadata persistence | Three layers: host properties, alt text, image bytes. Verified on ODP and PPTX. |
@@ -93,12 +107,12 @@ Error messages are mapped to plain language and to a line in the user's source o
 - ONLYOFFICE older than 10.0 inserts equations but can't store their source (the plugin warns). It can't place PDF pictures, so PDF falls back to SVG there.
 - Tectonic's PDF output compresses the info dictionary, so the source lives in alt text only for Tectonic PDFs.
 - Inline equations inside text boxes, with baseline alignment, are out of scope. `depthBp` is recorded for a future version.
-- The ONLYOFFICE helper must be started by the user (`lavatex serve`). An autostart installer is planned.
+- The ONLYOFFICE setup has been tested on Linux (systemd socket activation and XDG autostart). The Windows and macOS autostart paths are implemented but untested.
 
 ## Next steps
 
 1. CI release builds for Windows, macOS (x86_64 and arm64) and Linux, producing a multi-platform `.oxt`.
 2. Validate in ONLYOFFICE Document Server (Desktop Editors 10.0 is tested).
-3. Add an autostart option for `lavatex serve` and a system-tray indicator.
+3. Test the setup on Windows and macOS; consider an installer that runs it.
 4. Build a PowerPoint Office.js add-in reusing `lavatex-core.js` and the helper. Read IguanaTeX tags for round trips.
 5. LibreOffice Writer and ONLYOFFICE Document Editor support.
