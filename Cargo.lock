@@ -200,6 +200,7 @@ dependencies = [
  "lavatex-core",
  "serde",
  "serde_json",
+ "tempfile",
  "tiny_http",
 ]
 

@@ -4,34 +4,39 @@
   <meta charset="utf-8">
   <title>LavaTeX</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- ONLYOFFICE plugin SDK, loaded from ONLYOFFICE like the official plugins. -->
-  <script src="https://onlyoffice.github.io/sdkjs-plugins/v1/plugins.js"></script>
-  <script src="https://onlyoffice.github.io/sdkjs-plugins/v1/plugins-ui.js"></script>
   <link rel="stylesheet" href="styles/plugin.css">
-  <script src="scripts/lavatex-core.js"></script>
-  <script src="scripts/plugin.js"></script>
+  <!-- Loads the ONLYOFFICE plugin SDK (a local copy when available), then LavaTeX. -->
+  <script src="scripts/sdk-loader.js"></script>
 </head>
 <body>
   <main class="lt">
     <div id="banner" class="banner" role="status" hidden></div>
 
     <section id="setup" class="setup" hidden>
-      <h2>Connect to your TeX installation</h2>
-      <p>LavaTeX renders with the TeX already on your computer (TeX Live, MiKTeX, MacTeX or Tectonic)
-        through a small helper program. Start it once, then paste its access token below.</p>
+      <h2 id="setupTitle">One-time setup needed</h2>
+      <p>LavaTeX renders equations with the TeX installed on this computer (TeX Live, MiKTeX or MacTeX),
+        just like IguanaTeX. ONLYOFFICE plugins cannot start programs themselves, so a small LavaTeX helper
+        does the rendering. It is set up once and then starts by itself.</p>
       <ol>
-        <li>Install LavaTeX and run <code>lavatex serve</code> (keep it running, or add it to your startup programs).</li>
-        <li>Run <code>lavatex token</code> and paste the token here.</li>
+        <li>Install a TeX distribution if you do not have one yet.</li>
+        <li>Download LavaTeX for your system from
+          <a href="https://github.com/LavakumarVeludandi/LavaTex/releases/latest" target="_blank" rel="noopener">github.com/LavakumarVeludandi/LavaTex/releases</a>.</li>
+        <li>In a terminal, run <code>lavatex setup onlyoffice</code>.</li>
       </ol>
-      <div class="row">
-        <label for="helperUrl">Helper address</label>
-        <input id="helperUrl" type="url" spellcheck="false">
-      </div>
-      <div class="row">
-        <label for="helperToken">Access token</label>
-        <input id="helperToken" type="password" spellcheck="false" autocomplete="off">
-        <button id="connect" type="button" class="btn">Connect</button>
-      </div>
+      <p><button id="retry" type="button" class="btn">Try again</button></p>
+      <details class="advanced">
+        <summary>Advanced: connect to a helper manually</summary>
+        <div class="row">
+          <label for="helperUrl">Helper address</label>
+          <input id="helperUrl" type="url" spellcheck="false">
+        </div>
+        <div class="row">
+          <label for="helperToken">Access token</label>
+          <input id="helperToken" type="password" spellcheck="false" autocomplete="off">
+          <button id="connect" type="button" class="btn">Connect</button>
+        </div>
+        <p class="hint">Use this for a helper started with <code>lavatex serve</code>; get the token with <code>lavatex token</code>.</p>
+      </details>
     </section>
 
     <section id="editor" class="editor">

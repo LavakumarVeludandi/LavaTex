@@ -32,7 +32,8 @@ const SDK_STUB = `
     executeMethod: function () {},
   } };
   window.__errors = [];
-  window.addEventListener("load", function () { window.Asc.plugin.init(""); });
+  // Like the real SDK: the handshake starts from window.onload.
+  window.onload = function () { window.Asc.plugin.init(""); };
 `;
 
 // Mock editor state lives in the page so plugin commands can reach it.
@@ -85,10 +86,18 @@ const MOCK_EDITOR = `
   })();
 `;
 
+// Pairing file served next to the plugin, as `lavatex setup onlyoffice` writes it.
+const virtualFiles = {};
+
 function serveStatic(dir, port) {
   const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".png": "image/png", ".json": "application/json" };
   const server = http.createServer((req, res) => {
-    const file = path.join(dir, decodeURIComponent(req.url.split("?")[0]));
+    const urlPath = decodeURIComponent(req.url.split("?")[0]);
+    if (virtualFiles[urlPath]) {
+      res.writeHead(200, { "Content-Type": "application/json" }).end(virtualFiles[urlPath]);
+      return;
+    }
+    const file = path.join(dir, urlPath);
     if (!file.startsWith(dir) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
       res.writeHead(404).end();
       return;
@@ -123,12 +132,18 @@ async function main() {
     const page = await context.newPage();
     page.on("pageerror", (e) => console.log("page error:", e.message));
 
-    // First run: no token yet, so the setup screen must appear.
+    // First run without `lavatex setup`: the one-time setup screen appears.
     await page.addInitScript(MOCK_EDITOR);
     await page.goto(`http://127.0.0.1:${PAGE_PORT}/index.html`);
     await page.waitForSelector("#setup:not([hidden])", { timeout: 15000 });
-    check(true, "setup screen shown when no token is configured");
+    check(/One-time setup needed/.test(await page.textContent("#setupTitle")), "one-time setup screen shown when not set up");
+    check((await page.textContent("#setup")).includes("lavatex setup onlyoffice"), "setup screen names the one command to run");
+    check(!(await page.isVisible("#editor")), "equation editor hidden until connected");
+    check(await page.evaluate(() => window.LAVATEX_SDK_BASE === "https://onlyoffice.github.io/sdkjs-plugins/v1/"),
+      "SDK loader falls back to the online SDK when no local copy exists");
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "onlyoffice-setup.png") });
+    // The manual route still works for advanced users.
+    await page.click("#setup details.advanced summary");
     await page.fill("#helperUrl", `http://127.0.0.1:${HELPER_PORT}`);
     await page.fill("#helperToken", TOKEN);
     await page.click("#connect");
@@ -194,6 +209,26 @@ async function main() {
     const err = await page.textContent("#status");
     check(/fracc/.test(err) && /line 2/.test(err), "compile error shown with line: " + err.trim());
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "onlyoffice-error.png") });
+
+    // After `lavatex setup onlyoffice`: a fresh profile connects by itself.
+    virtualFiles["/lavatex-helper.json"] = JSON.stringify({ url: `http://127.0.0.1:${HELPER_PORT}`, token: TOKEN });
+    const paired = await browser.newContext({ viewport: { width: 760, height: 640 } });
+    await paired.route("https://onlyoffice.github.io/sdkjs-plugins/v1/plugins.js", (r) =>
+      r.fulfill({ contentType: "text/javascript", body: SDK_STUB })
+    );
+    await paired.route("https://onlyoffice.github.io/sdkjs-plugins/v1/plugins-ui.js", (r) =>
+      r.fulfill({ contentType: "text/javascript", body: "" })
+    );
+    const page2 = await paired.newPage();
+    await page2.addInitScript(MOCK_EDITOR);
+    await page2.goto(`http://127.0.0.1:${PAGE_PORT}/index.html`);
+    await page2.waitForSelector("#editor:not([hidden])", { timeout: 15000 });
+    check(await page2.isHidden("#setup"), "paired install connects without any setup screen");
+    await page2.fill("#source", "a^2 + b^2 = c^2");
+    await page2.waitForSelector("#preview img", { timeout: 20000 });
+    check(true, "paired install renders a preview");
+    if (SHOTS) await page2.screenshot({ path: path.join(SHOTS, "onlyoffice-paired.png") });
+    await paired.close();
 
     const errors = await page.evaluate(() => window.__errors);
     check(errors.length === 0, "no exceptions inside editor commands " + (errors.join("; ") || ""));

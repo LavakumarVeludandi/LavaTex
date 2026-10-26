@@ -14,17 +14,23 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::io::Read;
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tiny_http::{Header, Method, Request, Response, Server};
 
 pub const DEFAULT_PORT: u16 = 7354;
+/// Seconds without requests after which an on-demand helper exits.
+pub const DEFAULT_IDLE_EXIT: u64 = 900;
 const MAX_BODY: usize = 512 * 1024;
 const WORKERS: usize = 4;
 const TOOLCHAIN_CACHE: Duration = Duration::from_secs(60);
 
 struct State {
     port: u16,
+    /// Seconds since `started` of the last request (for idle exit).
+    last_activity: AtomicU64,
+    started: Instant,
     token: String,
     toolchains: Mutex<Option<(Instant, Vec<Toolchain>)>>,
 }
@@ -43,7 +49,30 @@ impl State {
     }
 }
 
-pub fn run(port: u16, token: Option<String>) -> ExitCode {
+/// Socket handed over by systemd socket activation (`LISTEN_FDS`), if any.
+#[cfg(unix)]
+fn inherited_listener() -> Option<std::net::TcpListener> {
+    use std::os::fd::FromRawFd;
+    let pid: u32 = std::env::var("LISTEN_PID").ok()?.parse().ok()?;
+    let fds: u32 = std::env::var("LISTEN_FDS").ok()?.parse().ok()?;
+    if pid != std::process::id() || fds < 1 {
+        return None;
+    }
+    // SAFETY: systemd passes the listening socket as fd 3 (SD_LISTEN_FDS_START)
+    // and it is owned by nothing else in this process.
+    let listener = unsafe { std::net::TcpListener::from_raw_fd(3) };
+    listener.set_nonblocking(false).ok()?;
+    Some(listener)
+}
+
+#[cfg(not(unix))]
+fn inherited_listener() -> Option<std::net::TcpListener> {
+    None
+}
+
+/// Run the helper. With `idle_exit`, exit after that many seconds without a
+/// request (used when the OS starts the helper on demand).
+pub fn run(port: u16, token: Option<String>, idle_exit: Option<u64>) -> ExitCode {
     let token = match token {
         Some(t) if t.len() >= 16 => t,
         Some(_) => {
@@ -58,15 +87,29 @@ pub fn run(port: u16, token: Option<String>) -> ExitCode {
             }
         },
     };
-    let server = match Server::http(("127.0.0.1", port)) {
-        Ok(s) => Arc::new(s),
-        Err(e) => {
-            eprintln!("error: cannot listen on 127.0.0.1:{port}: {e}");
-            return ExitCode::from(1);
+    let (server, port) = match inherited_listener() {
+        Some(listener) => {
+            let port = listener.local_addr().map(|a| a.port()).unwrap_or(port);
+            match Server::from_listener(listener, None) {
+                Ok(s) => (Arc::new(s), port),
+                Err(e) => {
+                    eprintln!("error: cannot use the socket from the service manager: {e}");
+                    return ExitCode::from(1);
+                }
+            }
         }
+        None => match Server::http(("127.0.0.1", port)) {
+            Ok(s) => (Arc::new(s), port),
+            Err(e) => {
+                eprintln!("error: cannot listen on 127.0.0.1:{port}: {e}");
+                return ExitCode::from(1);
+            }
+        },
     };
     let state = Arc::new(State {
         port,
+        last_activity: AtomicU64::new(0),
+        started: Instant::now(),
         token,
         toolchains: Mutex::new(None),
     });
@@ -74,7 +117,18 @@ pub fn run(port: u16, token: Option<String>) -> ExitCode {
         "LavaTeX helper {} listening on http://127.0.0.1:{port}",
         lavatex_core::VERSION
     );
-    eprintln!("Plugin access token: {}", state.token);
+
+    if let Some(limit) = idle_exit.filter(|s| *s > 0) {
+        let state = Arc::clone(&state);
+        std::thread::spawn(move || loop {
+            std::thread::sleep(Duration::from_secs(5));
+            let idle =
+                state.started.elapsed().as_secs() - state.last_activity.load(Ordering::Relaxed);
+            if idle >= limit {
+                std::process::exit(0);
+            }
+        });
+    }
 
     let handles: Vec<_> = (0..WORKERS)
         .map(|_| {
@@ -82,6 +136,9 @@ pub fn run(port: u16, token: Option<String>) -> ExitCode {
             let state = Arc::clone(&state);
             std::thread::spawn(move || {
                 for request in server.incoming_requests() {
+                    state
+                        .last_activity
+                        .store(state.started.elapsed().as_secs(), Ordering::Relaxed);
                     handle(&state, request);
                 }
             })
@@ -205,6 +262,14 @@ fn handle(state: &State, mut req: Request) {
     }
 
     match (method, path.as_str()) {
+        (Method::Post, "/v1/shutdown") => {
+            // Used by `lavatex setup` to replace an older helper.
+            respond(req, 200, json!({"ok": true}));
+            std::thread::spawn(|| {
+                std::thread::sleep(Duration::from_millis(200));
+                std::process::exit(0);
+            });
+        }
         (Method::Get, "/v1/toolchains") => {
             let list = state.toolchains(query.contains("refresh=1"));
             let config = Config::load();

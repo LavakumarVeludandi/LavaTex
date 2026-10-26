@@ -137,37 +137,102 @@
 
   // --- helper connection -------------------------------------------------
 
-  function connect() {
-    state.helper = new LT.Helper(state.settings.helperUrl, state.settings.token);
-    $("helperInfo").textContent = state.settings.helperUrl;
-    return state.helper
+  /** The pairing file written next to the plugin by `lavatex setup onlyoffice`. */
+  function readPairing() {
+    return new Promise(function (resolve) {
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", "lavatex-helper.json?" + Date.now(), true);
+        xhr.onload = function () {
+          // file:// answers with status 0 in ONLYOFFICE Desktop.
+          if (xhr.status !== 200 && xhr.status !== 0) return resolve(null);
+          try {
+            var p = JSON.parse(xhr.responseText);
+            resolve(p && p.url && p.token ? p : null);
+          } catch (e) {
+            resolve(null);
+          }
+        };
+        xhr.onerror = function () {
+          resolve(null);
+        };
+        xhr.send();
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  }
+
+  /** Try one helper address and token; resolves with the toolchain list. */
+  function tryHelper(url, token) {
+    var helper = new LT.Helper(url, token);
+    return helper
       .health()
       .catch(function () {
         throw new Error("unreachable");
       })
       .then(function () {
-        return state.helper.toolchains();
+        return helper.toolchains();
       })
       .then(function (res) {
         if (res.httpStatus === 401) throw new Error("token");
         if (!res.ok) throw new Error("helper");
-        state.connected = true;
-        showSetup(false);
-        fillToolchains(res.toolchains || [], state.settings.toolchain);
-        $("helperInfo").textContent = "Connected to " + state.settings.helperUrl;
-        if (!res.toolchains || !res.toolchains.length) {
-          setStatus("No TeX installation was found on this computer. Install TeX Live, MiKTeX, MacTeX or Tectonic.", "error");
-        }
-        schedulePreview(0);
-      })
-      .catch(function (err) {
-        state.connected = false;
-        var msg =
-          err.message === "token"
-            ? "The access token was not accepted. Run \u201Clavatex token\u201D and paste the result."
-            : "LavaTeX could not reach its helper at " + state.settings.helperUrl + ". Is \u201Clavatex serve\u201D running?";
-        showSetup(true, msg);
+        return { helper: helper, url: url, token: token, toolchains: res.toolchains || [] };
       });
+  }
+
+  function connect(manual) {
+    $("helperInfo").textContent = state.settings.helperUrl;
+    return readPairing().then(function (pairing) {
+      // A paired install (lavatex setup onlyoffice) is authoritative; a
+      // manually entered helper is tried first only when the user asks.
+      var attempts = [];
+      var own = { url: state.settings.helperUrl, token: state.settings.token };
+      if (manual || !pairing) attempts.push(own);
+      if (pairing) attempts.push({ url: pairing.url, token: pairing.token });
+      if (!manual && pairing && own.token && own.token !== pairing.token) attempts.push(own);
+
+      var lastError = null;
+      var chain = Promise.reject(new Error("start"));
+      attempts.forEach(function (a) {
+        chain = chain.catch(function (err) {
+          if (err.message !== "start") lastError = err;
+          return tryHelper(a.url, a.token);
+        });
+      });
+      return chain
+        .then(function (ok) {
+          state.helper = ok.helper;
+          state.connected = true;
+          state.settings.helperUrl = ok.url;
+          state.settings.token = ok.token;
+          saveSettings();
+          showSetup(false);
+          setBanner(state.editingNote || "");
+          fillToolchains(ok.toolchains, state.settings.toolchain);
+          $("helperInfo").textContent = "Connected to " + ok.url + (pairing ? " (set up by lavatex setup)" : "");
+          if (!ok.toolchains.length) {
+            setStatus("No TeX installation was found on this computer. Install TeX Live, MiKTeX or MacTeX, then reopen LavaTeX.", "error");
+          }
+          schedulePreview(0);
+        })
+        .catch(function (err) {
+          state.connected = false;
+          var reason = (err.message === "start" ? lastError : err) || err;
+          var msg;
+          if (pairing && reason.message === "unreachable") {
+            msg = "The LavaTeX helper is not running. It normally starts by itself; run \u201Clavatex setup onlyoffice\u201D again to repair it, then click Try again.";
+          } else if (pairing || reason.message === "token") {
+            msg = "The LavaTeX helper did not accept this plugin. Run \u201Clavatex setup onlyoffice\u201D again, then click Try again.";
+          } else if (manual) {
+            msg = "Could not connect to " + state.settings.helperUrl + ".";
+          } else {
+            msg = "";
+          }
+          $("setupTitle").textContent = pairing ? "LavaTeX helper not available" : "One-time setup needed";
+          showSetup(true, msg);
+        });
+    });
   }
 
   // --- rendering -----------------------------------------------------------
@@ -367,7 +432,11 @@
       state.settings.token = $("helperToken").value.trim();
       saveSettings();
       setBanner("");
-      connect();
+      connect(true);
+    });
+    $("retry").addEventListener("click", function () {
+      setBanner("");
+      connect(false);
     });
     $("changeHelper").addEventListener("click", function () {
       showSetup(true, "");
@@ -391,7 +460,8 @@
         if (record.preamble !== state.settings.preamble) {
           notes.push("It carries its own preamble from the document; review it if the file came from someone else.");
         }
-        setBanner(notes.join(" "));
+        state.editingNote = notes.join(" ");
+        setBanner(state.editingNote);
       }
       $("source").focus();
       connect();
