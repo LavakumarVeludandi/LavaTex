@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!-- The LavaTeX ribbon tab. Buttons call the LavaTeX_* macros in vba/LavaTeX.bas;
-     image="..." names a picture in images/ (see tools/build_ppam.py). -->
+     image="..." names a picture in images/ (added with the Office RibbonX Editor). -->
 <customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui">
   <ribbon>
     <tabs>

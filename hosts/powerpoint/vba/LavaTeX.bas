@@ -2,10 +2,10 @@ Attribute VB_Name = "LavaTeX"
 ' LavaTeX for PowerPoint (LavaTeX.ppam).
 '
 ' The ribbon buttons call the LavaTeX_* procedures below. Rendering and the
-' editor window are done by lavatex-helper.exe, which is stored inside the
-' .ppam file and unpacked to %LOCALAPPDATA%\LavaTeX\engine\<version> on first
-' use. It writes the picture, alt.txt and result.txt into a temporary folder;
-' this module puts the picture on the slide.
+' editor window are done by lavatex-helper.exe, which is looked for next to
+' the .ppam file and in %LOCALAPPDATA%\Programs\LavaTeX. It writes the
+' picture, alt.txt and result.txt into a temporary folder; this module puts
+' the picture on the slide.
 '
 ' The LaTeX source travels with the picture in its alt text and in the shape
 ' tag LAVATEX, in the same format as LibreOffice and ONLYOFFICE use.
@@ -13,9 +13,7 @@ Attribute VB_Name = "LavaTeX"
 ' Only plain ASCII in this file: the VBA project is stored in code page 1252.
 Option Explicit
 
-' Filled in by tools/build_ppam.py.
-Private Const LAVATEX_VERSION As String = "__LAVATEX_VERSION__"
-Private Const ENGINE_PART As String = "lavatex/lavatex-helper.exe"
+Private Const LAVATEX_VERSION As String = "0.2.0"
 Private Const ENGINE_EXE As String = "lavatex-helper.exe"
 Private Const TAG_NAME As String = "LAVATEX"
 Private Const MARKER As String = "lavatex:1:"
@@ -291,41 +289,25 @@ Private Function EquationText(ByVal shp As Object) As String
 End Function
 
 ' ---------------------------------------------------------------------------
-' The engine (lavatex-helper.exe inside the .ppam)
+' The engine (lavatex-helper.exe, installed with LavaTeX)
 
 Private Function EnginePath() As String
-    EnginePath = ""
-    Dim engineDir As String, exe As String
-    engineDir = Environ$("LOCALAPPDATA") & "\LavaTeX\engine\" & LAVATEX_VERSION
-    exe = engineDir & "\" & ENGINE_EXE
-
-    Dim addinFile As String
+    Dim candidates(1 To 2) As String, i As Long, addinFile As String
     addinFile = AddinPath()
-    If addinFile = "" Then
-        MsgBox "LavaTeX cannot find its own add-in file. Add LavaTeX.ppam again under File > Options > Add-ins > PowerPoint Add-ins.", vbExclamation, "LavaTeX"
-        Exit Function
-    End If
-
-    Dim offset As Double, size As Double
-    If Not FindStoredEntry(addinFile, ENGINE_PART, offset, size) Then
-        MsgBox "The LavaTeX engine is missing from " & addinFile & ". Download LavaTeX.ppam again.", vbExclamation, "LavaTeX"
-        Exit Function
-    End If
-    If Len(Dir$(exe)) > 0 Then
-        If FileLen(exe) = size Then
-            EnginePath = exe
-            Exit Function
+    If addinFile <> "" Then candidates(1) = Left$(addinFile, InStrRev(addinFile, "\")) & ENGINE_EXE
+    candidates(2) = Environ$("LOCALAPPDATA") & "\Programs\LavaTeX\" & ENGINE_EXE
+    For i = 1 To 2
+        If candidates(i) <> "" Then
+            If Len(Dir$(candidates(i))) > 0 Then
+                EnginePath = candidates(i)
+                Exit Function
+            End If
         End If
-    End If
-
-    On Error GoTo Failed
-    MakeFolders engineDir
-    CopyBytes addinFile, offset, size, exe
-    EnginePath = exe
-    Exit Function
-Failed:
-    MsgBox "LavaTeX could not unpack its engine to " & engineDir & ": " & Err.Description, vbExclamation, "LavaTeX"
+    Next i
     EnginePath = ""
+    MsgBox "LavaTeX cannot find " & ENGINE_EXE & "." & vbCrLf & vbCrLf & _
+        "Put it in the same folder as LavaTeX.ppam, or in " & Environ$("LOCALAPPDATA") & "\Programs\LavaTeX.", _
+        vbExclamation, "LavaTeX"
 End Function
 
 ' Full path of this add-in's .ppam file.
@@ -367,96 +349,6 @@ Private Function ReadErrorText(ByVal outDir As String) As String
     Else
         ReadErrorText = "The LavaTeX engine stopped unexpectedly."
     End If
-End Function
-
-' ---------------------------------------------------------------------------
-' Reading the engine out of the .ppam (a zip file; the engine is stored
-' uncompressed, so it is a plain byte range)
-
-Private Function FindStoredEntry(ByVal zipPath As String, ByVal entryName As String, ByRef dataOffset As Double, ByRef dataSize As Double) As Boolean
-    FindStoredEntry = False
-    Dim f As Integer, fileSize As Double
-    On Error GoTo Failed
-    f = FreeFile
-    Open zipPath For Binary Access Read Shared As #f
-    fileSize = LOF(f)
-
-    ' End of central directory record: in the last 64 KiB + 22 bytes.
-    Dim tailSize As Long, tail() As Byte, i As Long, eocd As Long
-    tailSize = 65557
-    If fileSize < tailSize Then tailSize = fileSize
-    ReDim tail(0 To tailSize - 1)
-    Get #f, fileSize - tailSize + 1, tail
-    eocd = -1
-    For i = tailSize - 22 To 0 Step -1
-        If tail(i) = &H50 And tail(i + 1) = &H4B And tail(i + 2) = 5 And tail(i + 3) = 6 Then
-            eocd = i
-            Exit For
-        End If
-    Next i
-    If eocd < 0 Then GoTo Failed
-
-    Dim count As Long, cdSize As Double, cdOffset As Double
-    count = U16(tail, eocd + 10)
-    cdSize = U32(tail, eocd + 12)
-    cdOffset = U32(tail, eocd + 16)
-
-    Dim cd() As Byte
-    ReDim cd(0 To cdSize - 1)
-    Get #f, cdOffset + 1, cd
-
-    Dim p As Long, n As Long, nameLen As Long, extraLen As Long, commentLen As Long
-    Dim method As Long, entry As String, localOffset As Double, compSize As Double
-    p = 0
-    For n = 1 To count
-        If U32(cd, p) <> 33639248# Then GoTo Failed ' 0x02014B50
-        method = U16(cd, p + 10)
-        compSize = U32(cd, p + 20)
-        nameLen = U16(cd, p + 28)
-        extraLen = U16(cd, p + 30)
-        commentLen = U16(cd, p + 32)
-        localOffset = U32(cd, p + 42)
-        entry = ""
-        For i = 0 To nameLen - 1
-            entry = entry & Chr$(cd(p + 46 + i))
-        Next i
-        If entry = entryName And method = 0 Then
-            Dim lh(0 To 29) As Byte
-            Get #f, localOffset + 1, lh
-            dataOffset = localOffset + 30 + U16(lh, 26) + U16(lh, 28)
-            dataSize = compSize
-            FindStoredEntry = True
-            Exit For
-        End If
-        p = p + 46 + nameLen + extraLen + commentLen
-    Next n
-Failed:
-    If f <> 0 Then Close #f
-End Function
-
-Private Sub CopyBytes(ByVal src As String, ByVal offset As Double, ByVal size As Double, ByVal dest As String)
-    Dim buf() As Byte, fi As Integer, fo As Integer, tmp As String
-    ReDim buf(0 To size - 1)
-    fi = FreeFile
-    Open src For Binary Access Read Shared As #fi
-    Get #fi, offset + 1, buf
-    Close #fi
-    tmp = dest & ".part"
-    If Len(Dir$(tmp)) > 0 Then Kill tmp
-    fo = FreeFile
-    Open tmp For Binary Access Write As #fo
-    Put #fo, 1, buf
-    Close #fo
-    If Len(Dir$(dest)) > 0 Then Kill dest
-    Name tmp As dest
-End Sub
-
-Private Function U16(b() As Byte, ByVal i As Long) As Long
-    U16 = CLng(b(i)) + CLng(b(i + 1)) * 256&
-End Function
-
-Private Function U32(b() As Byte, ByVal i As Long) As Double
-    U32 = CDbl(b(i)) + CDbl(b(i + 1)) * 256# + CDbl(b(i + 2)) * 65536# + CDbl(b(i + 3)) * 16777216#
 End Function
 
 ' ---------------------------------------------------------------------------
