@@ -30,7 +30,7 @@ enum Cmd {
         json: bool,
     },
     /// Render an equation to SVG, PDF or PNG with embedded LavaTeX metadata.
-    Render(RenderArgs),
+    Render(Box<RenderArgs>),
     /// Print the LavaTeX metadata stored in an image or alt text.
     Inspect {
         /// Image file (SVG, PDF or PNG). Use `-` to read alt text from stdin.
@@ -345,7 +345,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
         Cmd::Detect { json } => cmd_detect(json),
-        Cmd::Render(args) => cmd_render(args),
+        Cmd::Render(args) => cmd_render(*args),
         Cmd::Inspect { file } => cmd_inspect(file),
         Cmd::Config {
             toolchain,
