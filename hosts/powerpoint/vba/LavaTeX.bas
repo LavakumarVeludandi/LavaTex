@@ -355,25 +355,26 @@ End Function
 ' Files
 
 Private Function NewWorkFolder() As String
-    Dim base As String, path As String
+    Dim fso As Object, base As String, path As String
+    Set fso = CreateObject("Scripting.FileSystemObject")
     base = Environ$("TEMP") & "\LavaTeX"
     MakeFolders base
     Randomize
     Do
         path = base & "\" & Format$(Now, "yyyymmddhhnnss") & "-" & CStr(Int(Rnd() * 1000000))
-    Loop While Len(Dir$(path, vbDirectory)) > 0
-    MkDir path
+    Loop While fso.FolderExists(path)
+    fso.CreateFolder path
     NewWorkFolder = path
 End Function
 
+' Create `path` and any missing parent folders. Uses FileSystemObject:
+' Dir$() does not see hidden folders such as AppData.
 Private Sub MakeFolders(ByVal path As String)
-    Dim parts() As String, i As Long, cur As String
-    parts = Split(path, "\")
-    cur = parts(0)
-    For i = 1 To UBound(parts)
-        cur = cur & "\" & parts(i)
-        If Len(Dir$(cur, vbDirectory)) = 0 Then MkDir cur
-    Next i
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If path = "" Or fso.FolderExists(path) Then Exit Sub
+    MakeFolders fso.GetParentFolderName(path)
+    fso.CreateFolder path
 End Sub
 
 Private Sub DeleteFolder(ByVal path As String)
