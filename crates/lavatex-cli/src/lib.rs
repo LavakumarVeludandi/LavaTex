@@ -1,8 +1,17 @@
 //! Shared code for the `lavatex` command and the `lavatex-helper` background
-//! program: the local render helper and the one-time host setup.
+//! program: the local render helper, the one-time host setup, and the
+//! commands used by the PowerPoint add-in.
 
+#[cfg(windows)]
+mod editor_window;
+pub mod ppt;
 pub mod serve;
 pub mod setup;
+
+/// Host files compiled into the binary (see build.rs).
+pub mod embedded {
+    include!(concat!(env!("OUT_DIR"), "/plugin_files.rs"));
+}
 
 use base64::Engine as _;
 use lavatex_core::config::Config;

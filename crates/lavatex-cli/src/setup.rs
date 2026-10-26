@@ -12,6 +12,7 @@
 //!    activation on Linux (it exits again when idle), at login on macOS
 //!    (LaunchAgent) and Windows (Run key, no console window).
 
+use crate::embedded;
 use crate::serve::{DEFAULT_IDLE_EXIT, DEFAULT_PORT};
 use lavatex_core::config::load_or_create_token;
 use std::io::{Read, Write};
@@ -19,10 +20,6 @@ use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::time::{Duration, Instant};
-
-mod embedded {
-    include!(concat!(env!("OUT_DIR"), "/plugin_files.rs"));
-}
 
 pub const PLUGIN_GUID: &str = "{6C1B2C4E-8D53-4F0A-9B7E-4A1E5D2F7C31}";
 /// Read by the plugin from its own folder to find the helper.

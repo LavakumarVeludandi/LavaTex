@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- The LavaTeX ribbon tab. Buttons call the LavaTeX_* macros in vba/LavaTeX.bas;
+     image="..." names a picture in images/ (see tools/build_ppam.py). -->
+<customUI xmlns="http://schemas.microsoft.com/office/2009/07/customui">
+  <ribbon>
+    <tabs>
+      <tab id="LavaTeXTab" label="LavaTeX" insertAfterMso="TabInsert">
+        <group id="LavaTeXEquation" label="Equation">
+          <button id="LavaTeXNew" label="New Equation" size="large" image="new"
+                  screentip="New LaTeX equation"
+                  supertip="Type LaTeX and insert it as a picture on the current slide."
+                  onAction="LavaTeX_New"/>
+          <button id="LavaTeXEdit" label="Edit Equation" size="large" image="edit"
+                  screentip="Edit the selected equation"
+                  supertip="Change the LaTeX of the selected equation. Its size, position and rotation are kept."
+                  onAction="LavaTeX_Edit"/>
+        </group>
+        <group id="LavaTeXSelection" label="Selection">
+          <button id="LavaTeXRegenerate" label="Regenerate" size="large" image="regenerate"
+                  screentip="Regenerate the selected equations"
+                  supertip="Render the selected equations again from their LaTeX, for example after installing a package."
+                  onAction="LavaTeX_Regenerate"/>
+        </group>
+        <group id="LavaTeXInfo" label="LavaTeX">
+          <button id="LavaTeXHelp" label="Help" size="large" image="help"
+                  screentip="LavaTeX user guide" onAction="LavaTeX_Help"/>
+          <button id="LavaTeXAbout" label="About" size="large" image="lavatex"
+                  screentip="About LavaTeX" onAction="LavaTeX_About"/>
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>
