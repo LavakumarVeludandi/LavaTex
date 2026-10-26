@@ -20,6 +20,15 @@ This document updates *LavaTeX Software Design Document v0.1* with the decisions
 | ONLYOFFICE plugin | HTML/JS | Dialog with live preview, insert/replace through the Builder API, alt-text metadata |
 | `scripts/lavatex-core.js` | Plain JS (UMD) | Alt-text parsing, sizing, helper client; reusable by a future Office.js add-in |
 
+### Loading the ONLYOFFICE plugin SDK
+
+The plugin does not bundle ONLYOFFICE's SDK (`plugins.js`, AGPL). `scripts/sdk-loader.js` loads it from:
+1. `../v1/` next to the plugin, which works for Document Server, built-in plugins, and Desktop's user plugin folder (Desktop keeps a copy there);
+2. the Desktop app's own `editors/sdkjs-plugins/v1/`, found from the editor's address;
+3. onlyoffice.github.io, only as a last resort.
+
+Plugins that load the SDK from the internet fail to start offline or behind a blocking proxy. The SDK starts its handshake from `window.onload`, so the loader calls that handler if the page has already finished loading.
+
 ### Why a localhost helper for ONLYOFFICE
 
 ONLYOFFICE plugins run in a sandboxed iframe and cannot start programs. Rendering with the user's own TeX therefore requires a small local process. `lavatex serve` is the same binary as the CLI. It is hardened as follows:
@@ -89,7 +98,7 @@ Error messages are mapped to plain language and to a line in the user's source o
 ## Next steps
 
 1. CI release builds for Windows, macOS (x86_64 and arm64) and Linux, producing a multi-platform `.oxt`.
-2. Validate in real ONLYOFFICE Desktop Editors and Document Server builds and publish the compatibility matrix.
+2. Validate in ONLYOFFICE Document Server (Desktop Editors 10.0 is tested).
 3. Add an autostart option for `lavatex serve` and a system-tray indicator.
 4. Build a PowerPoint Office.js add-in reusing `lavatex-core.js` and the helper. Read IguanaTeX tags for round trips.
 5. LibreOffice Writer and ONLYOFFICE Document Editor support.

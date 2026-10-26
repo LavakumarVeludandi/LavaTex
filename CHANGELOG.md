@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### ONLYOFFICE plugin
+
+Tested in ONLYOFFICE Desktop Editors 10.0.
+
+- **Works offline:** the plugin now uses the copy of ONLYOFFICE's plugin SDK that ships with ONLYOFFICE. It used to download it from the internet, and failed to start when that site couldn't be reached.
+- Fixed the equation editor showing underneath the "connect to your TeX installation" screen.
+- The release now includes `lavatex-onlyoffice-<version>.plugin`. Install it with *Plugins › Plugin Manager › Install plugin manually*.
+- Equations made in LibreOffice and saved as PPTX can be edited in ONLYOFFICE.
+
 ## [0.1.0] - 2026-10-26
 
 First release, for **LibreOffice Impress and Draw** (7.0 or newer). Equations are rendered with the TeX installation you already have: TeX Live, MiKTeX, MacTeX or Tectonic.

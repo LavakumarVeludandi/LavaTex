@@ -27,6 +27,9 @@ body.theme-dark {
 
 * { box-sizing: border-box; }
 
+/* Layout rules below set display; keep the hidden attribute authoritative. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   background: var(--bg);

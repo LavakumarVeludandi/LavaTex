@@ -18,12 +18,12 @@ LaTeX source ──► │ find your TeX  →  sandboxed compile  →  SVG / PDF
 
 ## Status
 
-Version 0.1.0, the first working build.
+Version 0.1.0 is released for LibreOffice. The ONLYOFFICE plugin is ready for the next release.
 
 | Host | Package | State |
 |---|---|---|
 | LibreOffice Impress & Draw 7.0+ | `lavatex-libreoffice-<version>-<platform>.oxt` | Insert, edit, and preview work. Tested end to end on LibreOffice 24.2 (Linux). |
-| ONLYOFFICE Presentation Editor 8.3+ (editing needs 10.0+) | `lavatex-onlyoffice-<version>.plugin` | Insert, edit, and live preview work. Tested in Chromium against a mock of the editor API (see [compatibility](docs/compatibility.md)). |
+| ONLYOFFICE Presentation Editor 8.3+ (editing needs 10.0+) | `lavatex-onlyoffice-<version>.plugin` | Insert, edit, and live preview work, offline too. Tested in ONLYOFFICE Desktop Editors 10.0, including editing equations made in LibreOffice (see [compatibility](docs/compatibility.md)). |
 | PowerPoint | — | Planned: Office.js add-in reusing the ONLYOFFICE web UI and helper. |
 
 ## Quick start
@@ -40,7 +40,7 @@ Version 0.1.0, the first working build.
    Several installations? Pick one with `lavatex config --toolchain <bin folder>`; every host uses this choice.
 3. **Install a host package:**
    - **LibreOffice:** *Tools › Extension Manager › Add* and pick the `.oxt`. It includes the `lavatex` binary. Then use *Insert › LaTeX Equation...* or the toolbar button. Select an existing equation and use the same command to edit it.
-   - **ONLYOFFICE:** *Plugins › Plugin Manager › Install plugin manually* and pick the `.plugin`. Run `lavatex serve` (keep it running), then `lavatex token`, and paste the token into the plugin the first time.
+   - **ONLYOFFICE:** open a presentation, go to *Plugins › Plugin Manager*, click **Install plugin manually** (bottom left) and pick the `.plugin`. Run `lavatex serve` (keep it running), then `lavatex token`, and paste the token into the plugin the first time.
 
 See [docs/installation.md](docs/installation.md) for details and troubleshooting.
 
@@ -97,4 +97,4 @@ python3 tools/package.py all                       # build dist/ packages
 
 ## License
 
-Apache License 2.0, see [LICENSE](LICENSE). LavaTeX contains no IguanaTeX code. The ONLYOFFICE plugin loads ONLYOFFICE's plugin SDK from ONLYOFFICE's site at runtime and does not bundle it.
+Apache License 2.0, see [LICENSE](LICENSE). LavaTeX contains no IguanaTeX code. The ONLYOFFICE plugin does not bundle ONLYOFFICE's plugin SDK. It uses the copy that ships with ONLYOFFICE, and falls back to ONLYOFFICE's site only if none is found.

@@ -30,7 +30,7 @@ The `.oxt` contains the `lavatex` binary for its platform(s). To use another bui
 
 ## 3. ONLYOFFICE (Presentation Editor)
 
-1. Open a **presentation** (LavaTeX only appears in the Presentation Editor), then go to *Plugins › Plugin Manager* and click the **Install plugin manually** link in the Plugin Manager window. Choose `lavatex-onlyoffice-<version>.plugin`.
+1. Open a **presentation** (LavaTeX only appears in the Presentation Editor), then go to *Plugins › Plugin Manager* and click the **Install plugin manually** link at the bottom left of the Plugin Manager window. Choose `lavatex-onlyoffice-<version>.plugin`.
 
    To install by hand instead, unzip the `.plugin` into a folder named `{6C1B2C4E-8D53-4F0A-9B7E-4A1E5D2F7C31}` inside the user plugin folder, then restart ONLYOFFICE:
    - Linux: `~/.local/share/onlyoffice/desktopeditors/data/sdkjs-plugins/`

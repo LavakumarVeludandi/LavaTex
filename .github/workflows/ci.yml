@@ -137,4 +137,5 @@ jobs:
           body_path: release-notes.md
           files: |
             dist/lavatex-libreoffice-*.oxt
+            dist/lavatex-onlyoffice-*.plugin
             dist/lavatex-cli-*.zip

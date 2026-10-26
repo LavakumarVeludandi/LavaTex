@@ -32,7 +32,8 @@ const SDK_STUB = `
     executeMethod: function () {},
   } };
   window.__errors = [];
-  window.addEventListener("load", function () { window.Asc.plugin.init(""); });
+  // Like the real SDK: the handshake starts from window.onload.
+  window.onload = function () { window.Asc.plugin.init(""); };
 `;
 
 // Mock editor state lives in the page so plugin commands can reach it.
@@ -128,6 +129,9 @@ async function main() {
     await page.goto(`http://127.0.0.1:${PAGE_PORT}/index.html`);
     await page.waitForSelector("#setup:not([hidden])", { timeout: 15000 });
     check(true, "setup screen shown when no token is configured");
+    check(!(await page.isVisible("#editor")), "equation editor hidden until connected");
+    check(await page.evaluate(() => window.LAVATEX_SDK_BASE === "https://onlyoffice.github.io/sdkjs-plugins/v1/"),
+      "SDK loader falls back to the online SDK when no local copy exists");
     if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "onlyoffice-setup.png") });
     await page.fill("#helperUrl", `http://127.0.0.1:${HELPER_PORT}`);
     await page.fill("#helperToken", TOKEN);

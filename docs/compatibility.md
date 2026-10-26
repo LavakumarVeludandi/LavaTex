@@ -10,10 +10,11 @@ Only combinations listed as **tested** have been run. Everything else is expecte
 | LibreOffice | LibreOffice 24.2.7, Linux, Python-UNO, headless | Insert SVG/PDF/PNG; edit keeps scale and position without duplicating; save as ODP and PPTX, reopen, edit again (`hosts/libreoffice/tests/test_headless.py`). |
 | LibreOffice | LibreOffice 24.2.7, Linux, Xvfb, installed `.oxt` | `unopkg` installs and registers; menu, add-on and toolbar entries appear, and the Tabbed UI's Extension tab button opens the dialog; dialog opens on a selected equation with its source; typing and *Update* replace the equation. |
 | ONLYOFFICE plugin | Chromium (Playwright) with a mock presentation API + real `lavatex serve` | Setup/token flow, live preview, insert as SVG with alt text, edit keeps scale/position/rotation, inline errors (`hosts/onlyoffice/tests/e2e.js`). |
+| ONLYOFFICE plugin | **ONLYOFFICE Desktop Editors 10.0.0**, Linux x86_64 (official build), Xvfb | Installs with *Plugin Manager › Install plugin manually*; LavaTeX appears in the Plugins tab. Loads the local SDK (works offline). Token setup, live preview, insert of a multi-line equation, edit replaces in place (one picture, alt text updated). An equation made in LibreOffice and saved as PPTX opens in ONLYOFFICE and is editable with source, size and colour restored. |
 | Helper | Linux | Token required (401), foreign Host header rejected (403), CORS/PNA preflight answered. |
 
 ## Not yet tested
 
-- Real ONLYOFFICE Desktop Editors and Document Server. The plugin uses `Api.GetSelection` (8.3+), `Api.CreateImage` with SVG data URLs (8.2+), and `ApiDrawing.Get/SetDescription` (10.0+), all checked against the ONLYOFFICE `sdkjs` source.
+- ONLYOFFICE Document Server and Desktop Editors on Windows and macOS. Desktop versions before 10.0 can insert equations but cannot store their source (no `ApiDrawing.SetDescription`).
 - Windows and macOS builds, MiKTeX, MacTeX and Tectonic on real machines. The detection paths are implemented, but CI for these platforms isn't wired up yet.
 - LibreOffice versions older than 24.2. The extension declares 7.0 as its minimum.
