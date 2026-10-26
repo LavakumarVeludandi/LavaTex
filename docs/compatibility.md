@@ -13,10 +13,13 @@ Only combinations listed as **tested** have been run. Everything else is expecte
 | ONLYOFFICE plugin | **ONLYOFFICE Desktop Editors 10.0.0**, Linux x86_64 (official build), Xvfb | Installs with *Plugin Manager › Install plugin manually*; LavaTeX appears in the Plugins tab. Loads the local SDK (works offline). Token setup, live preview, insert of a multi-line equation, edit replaces in place (one picture, alt text updated). An equation made in LibreOffice and saved as PPTX opens in ONLYOFFICE and is editable with source, size and colour restored. |
 | ONLYOFFICE setup | ONLYOFFICE Desktop Editors 10.0.0, Linux x86_64 | `lavatex setup onlyoffice` installs the plugin and pairing file; the plugin connects with no token entry; running setup again replaces the running helper; "Try again" recovers after the helper is started; `--uninstall` removes everything. |
 | Helper | Linux | Token required (401), foreign Host header rejected (403), CORS/PNA preflight answered. Socket activation (`systemd-socket-activate`) and idle exit. |
+| PowerPoint add-in | PowerPoint on Windows (tested by the maintainer) | `LavaTeX.ppam` loads under *Add-ins*, the LavaTeX tab appears, New Equation opens the editor window with live preview and inserts; no terminal windows appear while typing. |
+| PowerPoint editor page | Chromium (Playwright) + real `lavatex editor --stdio` | Live preview, TeX list, insert writes picture/`alt.txt`/`result.txt` and exits 0, Esc exits 1, edit loads the record, errors with line numbers keep the window open, settings remembered (`hosts/editor/tests/e2e.js`). |
 
 ## Not yet tested
 
 - ONLYOFFICE Document Server and Desktop Editors on Windows and macOS. Desktop versions before 10.0 can insert equations but cannot store their source (no `ApiDrawing.SetDescription`).
+- PowerPoint add-in: Edit Equation and Regenerate on many PowerPoint versions, PowerPoint 2016 (PNG fallback when SVG cannot be inserted), and equations made in LibreOffice/ONLYOFFICE opened in PowerPoint.
 - `lavatex setup onlyoffice` on Windows (Run key) and macOS (LaunchAgent), and with a real systemd user session on Linux.
 - Windows and macOS builds, MiKTeX, MacTeX and Tectonic on real machines. The detection paths are implemented, but CI for these platforms isn't wired up yet.
 - LibreOffice versions older than 24.2. The extension declares 7.0 as its minimum.

@@ -217,7 +217,7 @@ fn well_known_dirs() -> Vec<PathBuf> {
 }
 
 fn first_line_of_version(program: &Path) -> String {
-    Command::new(program)
+    crate::hide_console(&mut Command::new(program))
         .arg("--version")
         .output()
         .ok()

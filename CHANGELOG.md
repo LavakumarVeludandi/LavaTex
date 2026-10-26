@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-26
+
+Adds **PowerPoint** (Windows) and **ONLYOFFICE**, next to LibreOffice.
+
+### Download
+
+| File | For |
+|---|---|
+| `lavatex-powerpoint-0.2.0-windows-x86_64.zip` | **PowerPoint (Windows).** `LavaTeX.ppam` and `lavatex-helper.exe`; unzip and add the `.ppam` under *File › Options › Add-ins*. |
+| `lavatex-libreoffice-0.2.0-multi.oxt` | **LibreOffice** on any platform. |
+| `lavatex-<platform>.zip` | The `lavatex` program; for ONLYOFFICE run `lavatex setup onlyoffice`. |
+| `lavatex-onlyoffice-0.2.0.plugin` | The ONLYOFFICE plugin on its own (Document Server). |
+
+See the [installation guide](https://github.com/LavakumarVeludandi/LavaTex/blob/master/docs/installation.md).
+
+### PowerPoint add-in (new, Windows)
+
+- **`LavaTeX.ppam`**, a PowerPoint add-in like IguanaTeX: add it once under *File › Options › Add-ins*, and a **LavaTeX** tab appears on the ribbon with *New Equation*, *Edit Equation*, *Regenerate*, *Help* and *About*.
+- The editor opens in its own window with **live preview**, the same editor and rendering as in ONLYOFFICE and LibreOffice.
+- Editing keeps the equation's size, position, rotation and place in the stacking order.
+- *Regenerate* renders the selected equations again from their LaTeX, without opening the editor.
+- The LaTeX source is stored in the picture's alt text and a shape tag, so equations are editable in PowerPoint, LibreOffice and ONLYOFFICE alike.
+- Download `lavatex-powerpoint-<version>-windows-x86_64.zip`: it contains `LavaTeX.ppam` and `lavatex-helper.exe`. See the [installation guide](docs/installation.md#4-powerpoint-windows).
+
 ### ONLYOFFICE plugin
 
 Tested in ONLYOFFICE Desktop Editors 10.0.
@@ -22,6 +46,11 @@ Tested in ONLYOFFICE Desktop Editors 10.0.
 ### LibreOffice
 
 - The dialog preview no longer crops tall (multi-line) equations.
+
+### Fixes
+
+- ONLYOFFICE: clicking Insert right after typing could do nothing, because the pending preview replaced the render that Insert was waiting for.
+- Windows: TeX tools no longer open terminal windows when LavaTeX runs them from a program without a console.
 
 ## [0.1.0] - 2026-10-26
 

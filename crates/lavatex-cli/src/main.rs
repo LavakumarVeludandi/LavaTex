@@ -1,7 +1,7 @@
 //! `lavatex` — command-line front end and local render helper.
 
 use clap::{Parser, Subcommand};
-use lavatex_cli::{apply_config, serve, setup};
+use lavatex_cli::{apply_config, ppt, serve, setup};
 use lavatex_core::config::Config;
 use lavatex_core::render::{self, RenderRequest};
 use lavatex_core::{metadata, toolchain, Engine, Format, Mode};
@@ -61,6 +61,12 @@ enum Cmd {
     },
     /// One-time setup of a host application (currently: onlyoffice).
     Setup(setup::SetupArgs),
+    /// Editor window used by the PowerPoint add-in (Windows).
+    #[command(hide = true)]
+    Editor(ppt::EditorArgs),
+    /// Render an equation again from its alt text (PowerPoint add-in).
+    #[command(hide = true)]
+    Rerender(ppt::RerenderArgs),
 }
 
 #[derive(clap::Args)]
@@ -355,5 +361,7 @@ fn main() -> ExitCode {
             idle_exit,
         } => serve::run(port, token, Some(idle_exit)),
         Cmd::Setup(args) => setup::run(args),
+        Cmd::Editor(args) => ppt::editor(&args),
+        Cmd::Rerender(args) => ppt::rerender(&args),
     }
 }

@@ -19,7 +19,9 @@ This document updates *LavaTeX Software Design Document v0.1* with the decisions
 | `lavatex setup onlyoffice` | Rust | Installs the embedded plugin, the programs and the helper's autostart, and pairs plugin and helper |
 | LibreOffice extension | Python UNO + bundled `lavatex` | Dialog, insert/replace `GraphicObjectShape`, metadata on shapes |
 | ONLYOFFICE plugin | HTML/JS | Dialog with live preview, insert/replace through the Builder API, alt-text metadata |
-| `scripts/lavatex-core.js` | Plain JS (UMD) | Alt-text parsing, sizing, helper client; reusable by a future Office.js add-in |
+| `scripts/lavatex-core.js` | Plain JS (UMD) | Alt-text parsing, sizing, helper client; shared by the ONLYOFFICE plugin and the editor window |
+| PowerPoint add-in (`LavaTeX.ppam`) | VBA, saved in PowerPoint | Ribbon tab; runs `lavatex-helper.exe editor` / `rerender`; inserts and replaces pictures, metadata in alt text and the `LAVATEX` shape tag |
+| `lavatex-helper editor` | Rust, `wry`/`tao` (WebView2) | Editor window with live preview for the PowerPoint add-in (`hosts/editor`), Windows only |
 
 ### Loading the ONLYOFFICE plugin SDK
 
@@ -54,6 +56,16 @@ Users should not have to start a server. `lavatex setup onlyoffice` does it once
 The plugin reads `lavatex-helper.json` from its own folder, so it connects without asking the user anything. Manual URL and token entry remain under *Advanced* for Document Server.
 
 We chose this over a browser-only renderer (MathJax): like IguanaTeX, LavaTeX renders with the user's own TeX, so any package and the same output as in LibreOffice are available.
+
+### PowerPoint add-in
+
+Like IguanaTeX, the PowerPoint add-in is a `.ppam` file with VBA code, which users add under *File › Options › Add-ins*. The VBA stays small: it calls `lavatex-helper.exe` (kept next to the `.ppam`) and reads back plain files, so rendering, error messages and metadata are the same as in the other apps.
+
+- **Editor:** `lavatex-helper.exe editor --out <dir> [--alt-text-file <file>]` shows the editor page from `hosts/editor` in a WebView2 window. The page talks to Rust through `window.ipc` and renders with the shared core. On *Insert* it writes the picture, `alt.txt` and `result.txt` (`key=value`, so VBA needs no JSON parser) and exits with 0; *Cancel* exits with 1.
+- **Regenerate:** `lavatex-helper.exe rerender` renders an equation again from its stored record, without a window. It is also used to get a PNG when PowerPoint cannot insert SVG.
+- **Placement:** the VBA inserts the picture with `Shapes.AddPicture`, sets the alt text and the `LAVATEX` tag, and when editing copies position and rotation, restores the stacking order with `ZOrder`, keeps the user's scale (`previousWidthBp` from the old record) and deletes the old picture.
+- `lavatex-helper.exe` has no console window, so the TeX tools it starts are created with `CREATE_NO_WINDOW`.
+- The `.ppam` is saved by hand in PowerPoint (see [building-powerpoint-addin.md](building-powerpoint-addin.md)) and committed; CI packs it with the `lavatex-helper.exe` of each release.
 
 ## Accepted input
 
@@ -99,7 +111,7 @@ Error messages are mapped to plain language and to a line in the user's source o
 | Primary TeX engine | The user's choice. Auto order: latex+dvisvgm (TeX Live → MacTeX → MiKTeX) → others → Tectonic. |
 | SVG conversion | dvisvgm `--no-fonts` primarily; pdftocairo for PDF-only engines. |
 | Metadata persistence | Three layers: host properties, alt text, image bytes. Verified on ODP and PPTX. |
-| UI sharing | Shared web core for HTML hosts (ONLYOFFICE now, Office.js later); native UNO dialog for LibreOffice. |
+| UI sharing | Shared web core for HTML hosts (ONLYOFFICE plugin, PowerPoint editor window); native UNO dialog for LibreOffice. |
 | License | Apache-2.0. No IguanaTeX or TexMaths code is used. |
 
 ## Known limitations (0.1.0)
@@ -108,11 +120,12 @@ Error messages are mapped to plain language and to a line in the user's source o
 - Tectonic's PDF output compresses the info dictionary, so the source lives in alt text only for Tectonic PDFs.
 - Inline equations inside text boxes, with baseline alignment, are out of scope. `depthBp` is recorded for a future version.
 - The ONLYOFFICE setup has been tested on Linux (systemd socket activation and XDG autostart). The Windows and macOS autostart paths are implemented but untested.
+- The PowerPoint add-in works on Windows only. PowerPoint for Mac can load the `.ppam`, but the add-in tells Mac users it is not supported yet.
 
 ## Next steps
 
 1. CI release builds for Windows, macOS (x86_64 and arm64) and Linux, producing a multi-platform `.oxt`.
 2. Validate in ONLYOFFICE Document Server (Desktop Editors 10.0 is tested).
 3. Test the setup on Windows and macOS; consider an installer that runs it.
-4. Build a PowerPoint Office.js add-in reusing `lavatex-core.js` and the helper. Read IguanaTeX tags for round trips.
+4. PowerPoint: import IguanaTeX equations (read IguanaTeX's shape tags), a right-click menu entry, and macOS support.
 5. LibreOffice Writer and ONLYOFFICE Document Editor support.

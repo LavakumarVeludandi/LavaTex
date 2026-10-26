@@ -1,7 +1,7 @@
 {
   "name": "LavaTeX",
   "guid": "asc.{6C1B2C4E-8D53-4F0A-9B7E-4A1E5D2F7C31}",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "minVersion": "8.3.0",
   "offered": "LavaTeX contributors",
   "variations": [

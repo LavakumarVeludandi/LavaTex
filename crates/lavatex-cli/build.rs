@@ -1,5 +1,6 @@
-//! Embed the ONLYOFFICE plugin (hosts/onlyoffice) into the binary so that
-//! `lavatex setup onlyoffice` can install it without a separate download.
+//! Embed the ONLYOFFICE plugin (hosts/onlyoffice) and the editor window page
+//! (hosts/editor, used by the PowerPoint add-in) into the binary, so they
+//! need no separate download.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -32,31 +33,28 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-fn main() {
-    let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    // Not canonicalized: on Windows that yields \\?\ paths.
-    let plugin = manifest
-        .join("..")
-        .join("..")
-        .join("hosts")
-        .join("onlyoffice");
-    assert!(
-        plugin.is_dir(),
-        "hosts/onlyoffice not found at {}",
-        plugin.display()
-    );
-    println!("cargo:rerun-if-changed={}", plugin.display());
-
+fn host_files(dir: &Path) -> Vec<(String, PathBuf)> {
+    assert!(dir.is_dir(), "{} not found", dir.display());
+    println!("cargo:rerun-if-changed={}", dir.display());
     let mut files = Vec::new();
-    collect(&plugin, &plugin, &mut files);
-    let mut code = String::from("/// ONLYOFFICE plugin files: (path inside the plugin folder, contents).\npub static PLUGIN_FILES: &[(&str, &[u8])] = &[\n");
-    for path in &files {
+    collect(dir, dir, &mut files);
+    files
+        .into_iter()
+        .map(|path| {
+            let rel = path
+                .strip_prefix(dir)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            (rel, path)
+        })
+        .collect()
+}
+
+fn write_table(code: &mut String, name: &str, doc: &str, files: &[(String, PathBuf)]) {
+    writeln!(code, "/// {doc}\npub static {name}: &[(&str, &[u8])] = &[").unwrap();
+    for (rel, path) in files {
         println!("cargo:rerun-if-changed={}", path.display());
-        let rel = path
-            .strip_prefix(&plugin)
-            .unwrap()
-            .to_string_lossy()
-            .replace('\\', "/");
         writeln!(
             code,
             "    ({rel:?}, include_bytes!({:?})),",
@@ -65,6 +63,36 @@ fn main() {
         .unwrap();
     }
     code.push_str("];\n");
+}
+
+fn main() {
+    let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    // Not canonicalized: on Windows that yields \\?\ paths.
+    let hosts = manifest.join("..").join("..").join("hosts");
+    let onlyoffice = host_files(&hosts.join("onlyoffice"));
+    let mut editor = host_files(&hosts.join("editor"));
+    // The editor shares the browser core with the ONLYOFFICE plugin.
+    let core = onlyoffice
+        .iter()
+        .find(|(rel, _)| rel == "scripts/lavatex-core.js")
+        .expect("hosts/onlyoffice/scripts/lavatex-core.js")
+        .1
+        .clone();
+    editor.push(("lavatex-core.js".to_string(), core));
+
+    let mut code = String::new();
+    write_table(
+        &mut code,
+        "PLUGIN_FILES",
+        "ONLYOFFICE plugin files: (path inside the plugin folder, contents).",
+        &onlyoffice,
+    );
+    write_table(
+        &mut code,
+        "EDITOR_FILES",
+        "Editor window page files: (path, contents).",
+        &editor,
+    );
     let out = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("plugin_files.rs");
     std::fs::write(out, code).unwrap();
 }

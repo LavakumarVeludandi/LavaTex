@@ -482,6 +482,7 @@ fn run(
         .try_clone()
         .map_err(|e| RenderError::new(ErrorKind::Tool, e.to_string()))?;
     let mut cmd = Command::new(program);
+    crate::hide_console(&mut cmd);
     cmd.args(args)
         .current_dir(ws.dir.path())
         .stdin(Stdio::null())
