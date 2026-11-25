@@ -92,6 +92,8 @@ You can paste what you are used to:
 
 The last form is what IguanaTeX stores, so you can copy the source of an IguanaTeX equation from PowerPoint and paste it in.
 
+In PowerPoint you do not even need to copy: select an IguanaTeX equation and click **Edit Equation** or **Regenerate**. LavaTeX opens its LaTeX at its size and replaces it with a LavaTeX equation in the same place, at that size. After that, IguanaTeX no longer recognises it.
+
 ### Packages and macros
 
 Open **Preamble** in the dialog to add packages and your own commands, for example:

@@ -9,6 +9,10 @@
 //! - `rerender`: renders an equation again from its alt text (Regenerate,
 //!   or PNG instead of SVG for PowerPoint versions without SVG support).
 //!
+//! With `--iguanatex-size`, the input file is not a LavaTeX record but the
+//! LaTeX an IguanaTeX display keeps in its `LATEXADDIN` tag, so IguanaTeX
+//! equations can be edited and regenerated too.
+//!
 //! `result.txt` holds `key=value` lines (`file`, `format`, `widthBp`,
 //! `heightBp`, `depthBp`, and when editing `previousWidthBp`, the natural
 //! width of the equation being replaced, so the add-in can keep its scale).
@@ -16,7 +20,7 @@
 
 use crate::apply_config;
 use lavatex_core::config::{config_dir, Config};
-use lavatex_core::metadata::EquationMeta;
+use lavatex_core::metadata::{EquationMeta, SCHEMA};
 use lavatex_core::render::{self, Format, Mode, RenderOutput, RenderRequest};
 use lavatex_core::{toolchain, Engine};
 use serde_json::{json, Value};
@@ -35,6 +39,9 @@ pub struct EditorArgs {
     /// File with the alt text (or LAVATEX tag) of the equation to edit.
     #[arg(long)]
     pub alt_text_file: Option<PathBuf>,
+    /// The file holds IguanaTeX source instead; this is its point size.
+    #[arg(long, requires = "alt_text_file")]
+    pub iguanatex_size: Option<f64>,
     /// Folder to write the result into.
     #[arg(long)]
     pub out: PathBuf,
@@ -49,6 +56,9 @@ pub struct RerenderArgs {
     /// File with the alt text (or LAVATEX tag) of the equation.
     #[arg(long)]
     pub alt_text_file: PathBuf,
+    /// The file holds IguanaTeX source instead; this is its point size.
+    #[arg(long)]
+    pub iguanatex_size: Option<f64>,
     /// Folder to write the result into.
     #[arg(long)]
     pub out: PathBuf,
@@ -104,11 +114,38 @@ fn save_settings(request: &Value) {
     let _ = std::fs::write(dir.join(SETTINGS_FILE), s.to_string());
 }
 
-fn read_meta(path: &Path) -> Result<EquationMeta, String> {
+fn read_meta(path: &Path, iguanatex_size: Option<f64>) -> Result<EquationMeta, String> {
     let text = std::fs::read_to_string(path)
         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-    EquationMeta::from_alt_text(&text)
-        .map_err(|e| format!("This picture is not a LavaTeX equation ({e})."))
+    // VBA's ADODB.Stream starts UTF-8 files with a byte order mark.
+    let text = text.trim_start_matches('\u{feff}');
+    match iguanatex_size {
+        Some(size) => Ok(from_iguanatex(text.to_string(), size)),
+        None => EquationMeta::from_alt_text(text)
+            .map_err(|e| format!("This picture is not a LavaTeX equation ({e}).")),
+    }
+}
+
+/// An IguanaTeX display: its LaTeX (usually a whole document, whose preamble
+/// the renderer uses) and point size. The rest comes from the defaults.
+fn from_iguanatex(source: String, font_size: f64) -> EquationMeta {
+    let s = load_settings();
+    let text = |k: &str| s[k].as_str().unwrap_or("").to_string();
+    EquationMeta {
+        schema: SCHEMA.into(),
+        source,
+        preamble: text("preamble"),
+        mode: "display".into(),
+        font_size: if font_size > 0.0 { font_size } else { 20.0 },
+        // IguanaTeX colours come from the source itself.
+        color: "#000000".into(),
+        format: text("format"),
+        engine: text("engine"),
+        width_bp: 0.0,
+        height_bp: 0.0,
+        depth_bp: 0.0,
+        generator: "IguanaTeX".into(),
+    }
 }
 
 /// The editor's starting values: the equation being edited, or the defaults.
@@ -267,7 +304,7 @@ pub fn handle_message(msg: &Value, out_dir: &Path, previous: Option<&EquationMet
 }
 
 pub fn rerender(args: &RerenderArgs) -> ExitCode {
-    let meta = match read_meta(&args.alt_text_file) {
+    let meta = match read_meta(&args.alt_text_file, args.iguanatex_size) {
         Ok(m) => m,
         Err(e) => {
             write_error(&args.out, &e);
@@ -299,7 +336,12 @@ pub fn rerender(args: &RerenderArgs) -> ExitCode {
 }
 
 pub fn editor(args: &EditorArgs) -> ExitCode {
-    let meta = match args.alt_text_file.as_deref().map(read_meta).transpose() {
+    let meta = match args
+        .alt_text_file
+        .as_deref()
+        .map(|p| read_meta(p, args.iguanatex_size))
+        .transpose()
+    {
         Ok(m) => m,
         Err(e) => {
             write_error(&args.out, &e);
@@ -377,6 +419,23 @@ mod tests {
         let fresh = initial_state(None);
         assert_eq!(fresh["editing"], false);
         assert_eq!(fresh["values"]["source"], "");
+    }
+
+    #[test]
+    fn iguanatex_source_opens_for_editing() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("in.txt");
+        let doc = "\\documentclass{article}\n\\usepackage{amsmath}\n\\pagestyle{empty}\n\\begin{document}\n$x^2$\n\\end{document}";
+        std::fs::write(&file, format!("\u{feff}{doc}")).unwrap();
+        let meta = read_meta(&file, Some(28.0)).unwrap();
+        assert_eq!(meta.source, doc);
+        assert_eq!(meta.font_size, 28.0);
+        assert_eq!(meta.width_bp, 0.0); // no previousWidthBp: placed at natural size
+        let init = initial_state(Some(&meta));
+        assert_eq!(init["editing"], true);
+        assert_eq!(init["values"]["source"], doc);
+        // Without the flag the same file is not a LavaTeX record.
+        assert!(read_meta(&file, None).is_err());
     }
 
     #[test]

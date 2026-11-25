@@ -10,6 +10,9 @@ Attribute VB_Name = "LavaTeX"
 ' The LaTeX source travels with the picture in its alt text and in the shape
 ' tag LAVATEX, in the same format as LibreOffice and ONLYOFFICE use.
 '
+' IguanaTeX displays (LaTeX in the tag LATEXADDIN, size in IGUANATEXSIZE)
+' can be edited and regenerated too; they become LavaTeX equations then.
+'
 ' Only plain ASCII in this file: the VBA project is stored in code page 1252.
 Option Explicit
 
@@ -17,6 +20,8 @@ Private Const LAVATEX_VERSION As String = "0.2.0"
 Private Const ENGINE_EXE As String = "lavatex-helper.exe"
 Private Const TAG_NAME As String = "LAVATEX"
 Private Const MARKER As String = "lavatex:1:"
+Private Const IGUANA_TAG As String = "LATEXADDIN"
+Private Const IGUANA_SIZE_TAG As String = "IGUANATEXSIZE"
 Private Const SHAPE_NAME As String = "LavaTeX equation"
 Private Const HELP_URL As String = "https://github.com/LavakumarVeludandi/LavaTex/blob/master/docs/usage.md"
 
@@ -81,10 +86,10 @@ Private Sub RunEditor(ByVal wantEdit As Boolean)
         Exit Sub
     End If
 
-    Dim target As Object, altText As String
-    Set target = SelectedEquation(altText)
+    Dim target As Object, altText As String, iguanaSize As String
+    Set target = SelectedEquation(altText, iguanaSize)
     If wantEdit And target Is Nothing Then
-        MsgBox "Select a LavaTeX equation on the slide, then click Edit Equation." & vbCrLf & _
+        MsgBox "Select a LavaTeX or IguanaTeX equation on the slide, then click Edit Equation." & vbCrLf & _
             "(To type a new one, click New Equation.)", vbInformation, "LavaTeX"
         Exit Sub
     End If
@@ -98,10 +103,7 @@ Private Sub RunEditor(ByVal wantEdit As Boolean)
     work = NewWorkFolder()
     Dim args As String
     args = "editor --out " & Quote(work & "\out")
-    If Not target Is Nothing Then
-        WriteUtf8 work & "\in.txt", altText
-        args = args & " --alt-text-file " & Quote(work & "\in.txt")
-    End If
+    If Not target Is Nothing Then args = args & InputArgs(work, altText, iguanaSize)
 
     Dim code As Long
     code = RunEngine(engine, args)
@@ -130,21 +132,22 @@ Private Sub RegenerateSelection()
 
     Dim sld As Object
     Set sld = CurrentSlide()
-    Dim shapes As New Collection, alts As New Collection
+    Dim shapes As New Collection, alts As New Collection, sizes As New Collection
     If Not sld Is Nothing Then
         If ActiveWindow.Selection.Type = SEL_SHAPES Or ActiveWindow.Selection.Type = SEL_TEXT Then
-            Dim shp As Object, a As String
+            Dim shp As Object, a As String, sz As String
             For Each shp In ActiveWindow.Selection.ShapeRange
-                a = EquationText(shp)
+                a = EquationText(shp, sz)
                 If a <> "" Then
                     shapes.Add shp
                     alts.Add a
+                    sizes.Add sz
                 End If
             Next shp
         End If
     End If
     If shapes.Count = 0 Then
-        MsgBox "Select one or more LavaTeX equations, then click Regenerate.", vbInformation, "LavaTeX"
+        MsgBox "Select one or more LavaTeX or IguanaTeX equations, then click Regenerate.", vbInformation, "LavaTeX"
         Exit Sub
     End If
 
@@ -155,8 +158,7 @@ Private Sub RegenerateSelection()
     Dim i As Long, work As String, code As Long, problems As String, done As Long
     For i = 1 To shapes.Count
         work = NewWorkFolder()
-        WriteUtf8 work & "\in.txt", alts(i)
-        code = RunEngine(engine, "rerender --alt-text-file " & Quote(work & "\in.txt") & " --out " & Quote(work & "\out"))
+        code = RunEngine(engine, "rerender" & InputArgs(work, alts(i), sizes(i)) & " --out " & Quote(work & "\out"))
         If code = EXIT_OK Then
             PlaceResult sld, work & "\out", shapes(i), engine
             done = done + 1
@@ -261,9 +263,9 @@ Private Function CurrentSlide() As Object
     On Error GoTo 0
 End Function
 
-' The selected shape if it is exactly one LavaTeX equation; its record text
-' (tag or alt text) goes into `altText`.
-Private Function SelectedEquation(ByRef altText As String) As Object
+' The selected shape if it is exactly one equation; see EquationText for
+' `altText` and `iguanaSize`.
+Private Function SelectedEquation(ByRef altText As String, ByRef iguanaSize As String) As Object
     Set SelectedEquation = Nothing
     altText = ""
     On Error GoTo NoSelection
@@ -271,21 +273,43 @@ Private Function SelectedEquation(ByRef altText As String) As Object
     If ActiveWindow.Selection.ShapeRange.Count <> 1 Then Exit Function
     Dim shp As Object
     Set shp = ActiveWindow.Selection.ShapeRange(1)
-    altText = EquationText(shp)
+    altText = EquationText(shp, iguanaSize)
     If altText <> "" Then Set SelectedEquation = shp
     Exit Function
 NoSelection:
     Set SelectedEquation = Nothing
 End Function
 
-' The LavaTeX record text of a shape ("" if it is not an equation).
-Private Function EquationText(ByVal shp As Object) As String
+' The LavaTeX record text of a shape (tag or alt text). For an IguanaTeX
+' display: its LaTeX, with its point size in `iguanaSize`. "" if neither.
+Private Function EquationText(ByVal shp As Object, ByRef iguanaSize As String) As String
     Dim s As String
+    iguanaSize = ""
     On Error Resume Next
     s = shp.Tags(TAG_NAME)
     If InStr(1, s, MARKER, vbBinaryCompare) = 0 Then s = shp.AlternativeText
-    On Error GoTo 0
-    If InStr(1, s, MARKER, vbBinaryCompare) > 0 Then EquationText = s Else EquationText = ""
+    If InStr(1, s, MARKER, vbBinaryCompare) > 0 Then
+        EquationText = s
+        Exit Function
+    End If
+    s = ""
+    s = shp.Tags(IGUANA_TAG)
+    If Trim$(s) <> "" Then
+        ' Val and Str$ always use a dot, whatever the Windows locale.
+        iguanaSize = Trim$(Str$(Val(shp.Tags(IGUANA_SIZE_TAG))))
+        If Val(iguanaSize) <= 0 Then iguanaSize = "20"
+        EquationText = s
+    Else
+        EquationText = ""
+    End If
+End Function
+
+' Write an equation's text into the work folder; returns the arguments that
+' pass it to the engine.
+Private Function InputArgs(ByVal work As String, ByVal text As String, ByVal iguanaSize As String) As String
+    WriteUtf8 work & "\in.txt", text
+    InputArgs = " --alt-text-file " & Quote(work & "\in.txt")
+    If iguanaSize <> "" Then InputArgs = InputArgs & " --iguanatex-size " & iguanaSize
 End Function
 
 ' ---------------------------------------------------------------------------

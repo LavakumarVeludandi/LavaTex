@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### PowerPoint
+
+- **IguanaTeX equations:** select one and click *Edit Equation* or *Regenerate*. LavaTeX opens its LaTeX and size, and replaces it with a LavaTeX equation in the same place.
+
 ## [0.2.0] - 2026-10-26
 
 Adds **PowerPoint** (Windows) and **ONLYOFFICE**, next to LibreOffice.
