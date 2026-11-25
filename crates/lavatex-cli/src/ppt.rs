@@ -9,14 +9,21 @@
 //! - `rerender`: renders an equation again from its alt text (Regenerate,
 //!   or PNG instead of SVG for PowerPoint versions without SVG support).
 //!
+//! With `--iguanatex-size`, the input file is not a LavaTeX record but the
+//! LaTeX an IguanaTeX display keeps in its `LATEXADDIN` tag, so IguanaTeX
+//! equations can be edited and regenerated too.
+//!
 //! `result.txt` holds `key=value` lines (`file`, `format`, `widthBp`,
 //! `heightBp`, `depthBp`, and when editing `previousWidthBp`, the natural
 //! width of the equation being replaced, so the add-in can keep its scale).
-//! Errors go to `error.txt`. All text is UTF-8.
+//! Lines `tag.NAME=value` and the file `iguanatex.txt` are the shape tags
+//! IguanaTeX reads (`iguanatex.txt` is its `LATEXADDIN`), so IguanaTeX can
+//! edit LavaTeX equations. Errors go to `error.txt`. All text is UTF-8.
 
 use crate::apply_config;
 use lavatex_core::config::{config_dir, Config};
-use lavatex_core::metadata::EquationMeta;
+use lavatex_core::metadata::{EquationMeta, SCHEMA};
+use lavatex_core::normalize::normalize;
 use lavatex_core::render::{self, Format, Mode, RenderOutput, RenderRequest};
 use lavatex_core::{toolchain, Engine};
 use serde_json::{json, Value};
@@ -35,6 +42,9 @@ pub struct EditorArgs {
     /// File with the alt text (or LAVATEX tag) of the equation to edit.
     #[arg(long)]
     pub alt_text_file: Option<PathBuf>,
+    /// The file holds IguanaTeX source instead; this is its point size.
+    #[arg(long, requires = "alt_text_file")]
+    pub iguanatex_size: Option<f64>,
     /// Folder to write the result into.
     #[arg(long)]
     pub out: PathBuf,
@@ -49,6 +59,9 @@ pub struct RerenderArgs {
     /// File with the alt text (or LAVATEX tag) of the equation.
     #[arg(long)]
     pub alt_text_file: PathBuf,
+    /// The file holds IguanaTeX source instead; this is its point size.
+    #[arg(long)]
+    pub iguanatex_size: Option<f64>,
     /// Folder to write the result into.
     #[arg(long)]
     pub out: PathBuf,
@@ -104,11 +117,38 @@ fn save_settings(request: &Value) {
     let _ = std::fs::write(dir.join(SETTINGS_FILE), s.to_string());
 }
 
-fn read_meta(path: &Path) -> Result<EquationMeta, String> {
+fn read_meta(path: &Path, iguanatex_size: Option<f64>) -> Result<EquationMeta, String> {
     let text = std::fs::read_to_string(path)
         .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-    EquationMeta::from_alt_text(&text)
-        .map_err(|e| format!("This picture is not a LavaTeX equation ({e})."))
+    // VBA's ADODB.Stream starts UTF-8 files with a byte order mark.
+    let text = text.trim_start_matches('\u{feff}');
+    match iguanatex_size {
+        Some(size) => Ok(from_iguanatex(text.to_string(), size)),
+        None => EquationMeta::from_alt_text(text)
+            .map_err(|e| format!("This picture is not a LavaTeX equation ({e}).")),
+    }
+}
+
+/// An IguanaTeX display: its LaTeX (usually a whole document, whose preamble
+/// the renderer uses) and point size. The rest comes from the defaults.
+fn from_iguanatex(source: String, font_size: f64) -> EquationMeta {
+    let s = load_settings();
+    let text = |k: &str| s[k].as_str().unwrap_or("").to_string();
+    EquationMeta {
+        schema: SCHEMA.into(),
+        source,
+        preamble: text("preamble"),
+        mode: "display".into(),
+        font_size: if font_size > 0.0 { font_size } else { 20.0 },
+        // IguanaTeX colours come from the source itself.
+        color: "#000000".into(),
+        format: text("format"),
+        engine: text("engine"),
+        width_bp: 0.0,
+        height_bp: 0.0,
+        depth_bp: 0.0,
+        generator: "IguanaTeX".into(),
+    }
 }
 
 /// The editor's starting values: the equation being edited, or the defaults.
@@ -214,8 +254,71 @@ pub fn write_result(
     if let Some(p) = previous.filter(|p| p.width_bp > 0.0) {
         result.push_str(&format!("previousWidthBp={}\n", p.width_bp));
     }
+    std::fs::write(out_dir.join("iguanatex.txt"), iguanatex_document(&out.meta)).map_err(io)?;
+    result.push_str(&iguanatex_tags(out));
     // Written last: its presence means the other files are complete.
     std::fs::write(out_dir.join("result.txt"), result).map_err(io)
+}
+
+/// The LaTeX document IguanaTeX keeps in `LATEXADDIN`: a whole document, as
+/// IguanaTeX compiles it as is. One that is already whole stays unchanged.
+fn iguanatex_document(m: &EquationMeta) -> String {
+    if m.source.contains("\\begin{document}") {
+        return m.source.clone();
+    }
+    let norm = normalize(&m.source, Mode::parse(&m.mode).unwrap_or(Mode::Display));
+    let mut preamble = norm.preamble.unwrap_or_else(|| m.preamble.clone());
+    if norm.needs_amsmath && !preamble.contains("amsmath") && !preamble.contains("mathtools") {
+        preamble.push_str("\n\\usepackage{amsmath}");
+    }
+    let mut body = norm.body;
+    if norm.mode != Mode::Text {
+        // As when LavaTeX renders: a blank line is not allowed inside math.
+        body = body
+            .lines()
+            .map(|l| if l.trim().is_empty() { "%" } else { l })
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+    let open = match norm.mode {
+        Mode::Display => "$\\displaystyle\n",
+        Mode::Inline => "$\n",
+        Mode::Text => "",
+    };
+    let close = if norm.mode == Mode::Text { "" } else { "\n$" };
+    let color = match render::parse_color(&m.color) {
+        Some((r, g, b)) if (r, g, b) != (0.0, 0.0, 0.0) => {
+            preamble.push_str("\n\\usepackage{color}");
+            format!("\\color[rgb]{{{r:.4},{g:.4},{b:.4}}}\n")
+        }
+        _ => String::new(),
+    };
+    format!(
+        "\\documentclass{{article}}\n{preamble}\n\\pagestyle{{empty}}\n\\begin{{document}}\n\n{color}{open}{body}{close}\n\n\\end{{document}}"
+    )
+}
+
+/// The other tags IguanaTeX reads when it edits a display.
+fn iguanatex_tags(out: &RenderOutput) -> String {
+    let size = out.meta.font_size;
+    // IguanaTeX keeps the user's scale from ORIGINALWIDTH/HEIGHT: the size at
+    // 10 pt. Output type SVG tells it these are plain points (no dpi factor).
+    let mut tags = format!(
+        "tag.IGUANATEXSIZE={size}\ntag.ORIGINALWIDTH={}\ntag.ORIGINALHEIGHT={}\n\
+         tag.OUTPUTTYPE=SVG\ntag.BitmapVector=0\ntag.TRANSPARENCY=True\n",
+        out.width_bp * 10.0 / size,
+        out.height_bp * 10.0 / size,
+    );
+    // Index in IguanaTeX's list: latex (DVI), pdflatex, xelatex, lualatex, platex, tectonic.
+    let id = match out.engine {
+        Engine::Latex => 0,
+        Engine::Pdflatex => 1,
+        Engine::Xelatex => 2,
+        Engine::Lualatex => 3,
+        Engine::Tectonic => 5,
+    };
+    tags.push_str(&format!("tag.LATEXENGINEID={id}\n"));
+    tags
 }
 
 fn write_error(out_dir: &Path, message: &str) {
@@ -267,7 +370,7 @@ pub fn handle_message(msg: &Value, out_dir: &Path, previous: Option<&EquationMet
 }
 
 pub fn rerender(args: &RerenderArgs) -> ExitCode {
-    let meta = match read_meta(&args.alt_text_file) {
+    let meta = match read_meta(&args.alt_text_file, args.iguanatex_size) {
         Ok(m) => m,
         Err(e) => {
             write_error(&args.out, &e);
@@ -299,7 +402,12 @@ pub fn rerender(args: &RerenderArgs) -> ExitCode {
 }
 
 pub fn editor(args: &EditorArgs) -> ExitCode {
-    let meta = match args.alt_text_file.as_deref().map(read_meta).transpose() {
+    let meta = match args
+        .alt_text_file
+        .as_deref()
+        .map(|p| read_meta(p, args.iguanatex_size))
+        .transpose()
+    {
         Ok(m) => m,
         Err(e) => {
             write_error(&args.out, &e);
@@ -377,6 +485,81 @@ mod tests {
         let fresh = initial_state(None);
         assert_eq!(fresh["editing"], false);
         assert_eq!(fresh["values"]["source"], "");
+    }
+
+    #[test]
+    fn iguanatex_source_opens_for_editing() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("in.txt");
+        let doc = "\\documentclass{article}\n\\usepackage{amsmath}\n\\pagestyle{empty}\n\\begin{document}\n$x^2$\n\\end{document}";
+        std::fs::write(&file, format!("\u{feff}{doc}")).unwrap();
+        let meta = read_meta(&file, Some(28.0)).unwrap();
+        assert_eq!(meta.source, doc);
+        assert_eq!(meta.font_size, 28.0);
+        assert_eq!(meta.width_bp, 0.0); // no previousWidthBp: placed at natural size
+        let init = initial_state(Some(&meta));
+        assert_eq!(init["editing"], true);
+        assert_eq!(init["values"]["source"], doc);
+        // Without the flag the same file is not a LavaTeX record.
+        assert!(read_meta(&file, None).is_err());
+    }
+
+    #[test]
+    fn iguanatex_gets_a_whole_document() {
+        let meta = |source: &str, mode: &str, color: &str| {
+            EquationMeta::from_json(
+                &json!({
+                    "schema": SCHEMA, "source": source, "preamble": "\\usepackage{amsmath}",
+                    "mode": mode, "fontSize": 20, "color": color,
+                })
+                .to_string(),
+            )
+            .unwrap()
+        };
+        let doc = iguanatex_document(&meta("a = b", "display", "#000000"));
+        assert!(doc.starts_with("\\documentclass{article}\n\\usepackage{amsmath}\n"));
+        assert!(doc.contains("$\\displaystyle\na = b\n$"));
+        assert!(doc.ends_with("\\end{document}"));
+        assert!(!doc.contains("\\color"));
+        // Delimiters are unwrapped as LavaTeX does; colour goes into the document.
+        let doc = iguanatex_document(&meta("\\[x^2\\]", "inline", "#ff0000"));
+        assert!(doc.contains("\\color[rgb]{1.0000,0.0000,0.0000}"));
+        assert!(doc.contains("x^2") && !doc.contains("\\["));
+        // A whole document (for example from IguanaTeX) goes back unchanged.
+        let whole = "\\documentclass{article}\n\\begin{document}\n$x$\n\\end{document}";
+        assert_eq!(
+            iguanatex_document(&meta(whole, "display", "#000000")),
+            whole
+        );
+    }
+
+    #[test]
+    fn iguanatex_tags_keep_size_and_engine() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut meta =
+            EquationMeta::from_json(&json!({"schema": SCHEMA, "source": "x"}).to_string()).unwrap();
+        meta.font_size = 40.0;
+        let out = RenderOutput {
+            format: Format::Svg,
+            mime: "image/svg+xml",
+            bytes: b"<svg/>".to_vec(),
+            width_bp: 80.0,
+            height_bp: 20.0,
+            depth_bp: 0.0,
+            meta,
+            alt_text: "x".into(),
+            engine: Engine::Xelatex,
+            toolchain: String::new(),
+            warnings: Vec::new(),
+        };
+        write_result(dir.path(), &out, None).unwrap();
+        let result = std::fs::read_to_string(dir.path().join("result.txt")).unwrap();
+        assert!(result.contains("tag.IGUANATEXSIZE=40\n"));
+        assert!(result.contains("tag.ORIGINALWIDTH=20\n"));
+        assert!(result.contains("tag.ORIGINALHEIGHT=5\n"));
+        assert!(result.contains("tag.LATEXENGINEID=2\n"));
+        let doc = std::fs::read_to_string(dir.path().join("iguanatex.txt")).unwrap();
+        assert!(doc.contains("\\begin{document}"));
     }
 
     #[test]

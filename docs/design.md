@@ -127,5 +127,5 @@ Error messages are mapped to plain language and to a line in the user's source o
 1. CI release builds for Windows, macOS (x86_64 and arm64) and Linux, producing a multi-platform `.oxt`.
 2. Validate in ONLYOFFICE Document Server (Desktop Editors 10.0 is tested).
 3. Test the setup on Windows and macOS; consider an installer that runs it.
-4. PowerPoint: import IguanaTeX equations (read IguanaTeX's shape tags), a right-click menu entry, and macOS support.
+4. PowerPoint: a right-click menu entry and macOS support. (Editing IguanaTeX equations is done: the add-in reads their `LATEXADDIN` and `IGUANATEXSIZE` tags.)
 5. LibreOffice Writer and ONLYOFFICE Document Editor support.

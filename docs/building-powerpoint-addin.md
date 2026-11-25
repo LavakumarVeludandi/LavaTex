@@ -65,3 +65,4 @@ Pushing a `v*` tag makes CI build everything and attach `lavatex-powerpoint-<ver
 - **Regenerate** runs `lavatex-helper.exe rerender --alt-text-file … --out …` for each selected equation, without a window.
 - The add-in inserts the picture, sets its alt text and the shape tag `LAVATEX` to the contents of `alt.txt`, and when replacing keeps position, rotation, stacking order and the user's scale (`previousWidthBp` in `result.txt`).
 - If PowerPoint cannot insert SVG, the add-in asks for a PNG with `rerender --format png`.
+- **IguanaTeX.** Each LavaTeX picture also gets the tags IguanaTeX reads: `LATEXADDIN` (a whole LaTeX document, from `iguanatex.txt`) and the `tag.NAME=value` lines of `result.txt` (size, 10 pt width and height, engine). For a shape with only IguanaTeX tags, the add-in passes `LATEXADDIN` with `--iguanatex-size`. Whichever add-in edits last writes a new shape with its own tags.

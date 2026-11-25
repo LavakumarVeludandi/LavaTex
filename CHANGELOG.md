@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### PowerPoint
+
+- **Works both ways with IguanaTeX.** Select an IguanaTeX equation and click *Edit Equation* or *Regenerate*: LavaTeX opens its LaTeX and replaces it at the same place and scale. LavaTeX equations also carry IguanaTeX's tags, so IguanaTeX's *Edit LaTeX display* opens them too.
+- Equations inside a group can be edited; they stay in the group.
+
 ## [0.2.0] - 2026-10-26
 
 Adds **PowerPoint** (Windows) and **ONLYOFFICE**, next to LibreOffice.
