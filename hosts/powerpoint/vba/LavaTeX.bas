@@ -10,8 +10,10 @@ Attribute VB_Name = "LavaTeX"
 ' The LaTeX source travels with the picture in its alt text and in the shape
 ' tag LAVATEX, in the same format as LibreOffice and ONLYOFFICE use.
 '
-' IguanaTeX displays (LaTeX in the tag LATEXADDIN, size in IGUANATEXSIZE)
-' can be edited and regenerated too; they become LavaTeX equations then.
+' Equations work both ways with IguanaTeX: LavaTeX edits IguanaTeX displays
+' (LaTeX in the tag LATEXADDIN, size in IGUANATEXSIZE), and writes those tags
+' on its own pictures too, so IguanaTeX can edit them. Whichever add-in
+' edits last makes a new shape with its own record.
 '
 ' Only plain ASCII in this file: the VBA project is stored in code page 1252.
 Option Explicit
@@ -35,6 +37,7 @@ Private Const SEL_TEXT As Long = 3         ' ppSelectionText
 Private Const MSO_FALSE As Long = 0
 Private Const MSO_TRUE As Long = -1
 Private Const SEND_BACKWARD As Long = 3    ' msoSendBackward
+Private Const MSO_GROUP As Long = 6        ' msoGroup
 
 #If Mac Then
 #ElseIf VBA7 Then
@@ -134,17 +137,15 @@ Private Sub RegenerateSelection()
     Set sld = CurrentSlide()
     Dim shapes As New Collection, alts As New Collection, sizes As New Collection
     If Not sld Is Nothing Then
-        If ActiveWindow.Selection.Type = SEL_SHAPES Or ActiveWindow.Selection.Type = SEL_TEXT Then
-            Dim shp As Object, a As String, sz As String
-            For Each shp In ActiveWindow.Selection.ShapeRange
-                a = EquationText(shp, sz)
-                If a <> "" Then
-                    shapes.Add shp
-                    alts.Add a
-                    sizes.Add sz
-                End If
-            Next shp
-        End If
+        Dim shp As Object, a As String, sz As String
+        For Each shp In SelectedShapes()
+            a = EquationText(shp, sz)
+            If a <> "" Then
+                shapes.Add shp
+                alts.Add a
+                sizes.Add sz
+            End If
+        Next shp
     End If
     If shapes.Count = 0 Then
         MsgBox "Select one or more LavaTeX or IguanaTeX equations, then click Regenerate.", vbInformation, "LavaTeX"
@@ -180,7 +181,7 @@ End Sub
 ' Placing pictures
 
 ' Put the rendered picture on the slide. With `old`, replace that shape and
-' keep its scale, position, rotation and place in the stacking order.
+' keep its scale, position, rotation, group and place in the stacking order.
 Private Sub PlaceResult(ByVal sld As Object, ByVal outDir As String, ByVal old As Object, ByVal engine As String)
     Dim result As Object
     Set result = ReadResult(outDir & "\result.txt")
@@ -192,9 +193,12 @@ Private Sub PlaceResult(ByVal sld As Object, ByVal outDir As String, ByVal old A
     w = ToNumber(result("widthBp"))
     h = ToNumber(result("heightBp"))
     scaleBy = 1
-    If Not old Is Nothing And result.Exists("previousWidthBp") Then
-        If ToNumber(result("previousWidthBp")) > 0 Then
-            scaleBy = old.Width / ToNumber(result("previousWidthBp"))
+    If Not old Is Nothing Then
+        ' The old equation's width before anyone resized it.
+        Dim natural As Double
+        If result.Exists("previousWidthBp") Then natural = ToNumber(result("previousWidthBp")) Else natural = IguanaWidth(old)
+        If natural > 0 Then
+            scaleBy = old.Width / natural
             If scaleBy < 0.01 Or scaleBy > 100 Then scaleBy = 1
         End If
     End If
@@ -230,21 +234,124 @@ Private Sub PlaceResult(ByVal sld As Object, ByVal outDir As String, ByVal old A
     shp.Name = SHAPE_NAME
     shp.AlternativeText = altText
     shp.Tags.Add TAG_NAME, altText
+    AddIguanaTeXTags shp, outDir, result
     On Error Resume Next
     shp.Title = "LaTeX equation"
     On Error GoTo 0
 
     If Not old Is Nothing Then
         shp.Rotation = old.Rotation
-        Dim guard As Long
-        Do While shp.ZOrderPosition > old.ZOrderPosition + 1 And guard < 1000
-            shp.ZOrder SEND_BACKWARD
-            guard = guard + 1
-        Loop
-        old.Delete
+        If old.Child = MSO_TRUE Then
+            ReplaceInGroup old, shp
+        Else
+            StackAbove shp, old
+            old.Delete
+        End If
     End If
+    On Error Resume Next ' after regrouping, selecting a group member can fail
     shp.Select
 End Sub
+
+' The tags IguanaTeX reads, so it can edit this equation too: LATEXADDIN from
+' iguanatex.txt, the others from the `tag.NAME=value` lines of result.txt.
+Private Sub AddIguanaTeXTags(ByVal shp As Object, ByVal outDir As String, ByVal result As Object)
+    If Not CreateObject("Scripting.FileSystemObject").FileExists(outDir & "\iguanatex.txt") Then Exit Sub
+    shp.Tags.Add IGUANA_TAG, ReadUtf8(outDir & "\iguanatex.txt")
+    Dim k As Variant
+    For Each k In result.Keys
+        If Left$(k, 4) = "tag." Then shp.Tags.Add Mid$(k, 5), result(k)
+    Next k
+End Sub
+
+' The width IguanaTeX gave a display before anyone resized it, 0 if unknown:
+' its 10 pt width (ORIGINALWIDTH) at its point size, for bitmaps also times
+' 96 / dpi, the way IguanaTeX sizes them.
+Private Function IguanaWidth(ByVal shp As Object) As Double
+    Dim w As Double, kind As String
+    On Error Resume Next
+    w = Val(shp.Tags("ORIGINALWIDTH")) * Val(shp.Tags(IGUANA_SIZE_TAG)) / 10
+    kind = shp.Tags("OUTPUTTYPE")
+    If kind = "PNG" Or (kind = "" And shp.Tags("BitmapVector") <> "1") Then
+        If Val(shp.Tags("OUTPUTDPI")) <= 0 Then Exit Function
+        w = w * 96 / Val(shp.Tags("OUTPUTDPI"))
+    End If
+    IguanaWidth = w
+End Function
+
+' Move `shp` just above `ref` in the stacking order.
+Private Sub StackAbove(ByVal shp As Object, ByVal ref As Object)
+    Dim guard As Long
+    Do While shp.ZOrderPosition > ref.ZOrderPosition + 1 And guard < 1000
+        shp.ZOrder SEND_BACKWARD
+        guard = guard + 1
+    Loop
+End Sub
+
+' Swap `old`, a member of a group, for `shp`: PowerPoint cannot add a shape
+' to a group, so ungroup each level down to `old` and group again.
+' shortcut: animations set on the group itself are lost, as when regrouping
+' by hand; keep them (like IguanaTeX does) if users miss them.
+Private Sub ReplaceInGroup(ByVal old As Object, ByVal shp As Object)
+    Dim top As Object
+    Set top = old.ParentGroup
+    Do While top.Child = MSO_TRUE
+        Set top = top.ParentGroup
+    Loop
+    Regroup top, old.Id, shp
+End Sub
+
+' Ungroup `grp`, put `shp` where the member with id `oldId` was, and group
+' again under the same name. Returns the new group.
+Private Function Regroup(ByVal grp As Object, ByVal oldId As Long, ByVal shp As Object) As Object
+    Dim sld As Object, groupName As String, it As Object
+    Dim members As New Collection, keep As New Collection
+    Set sld = grp.Parent
+    groupName = grp.Name
+    For Each it In grp.Ungroup
+        members.Add it
+    Next it
+    For Each it In members
+        If it.Id = oldId Then
+            StackAbove shp, it
+            it.Delete
+            keep.Add shp
+        ElseIf ContainsId(it, oldId) Then
+            keep.Add Regroup(it, oldId, shp)
+        Else
+            keep.Add it
+        End If
+    Next it
+    Dim g As Object
+    Set g = ShapesById(sld, keep).Group
+    g.Name = groupName
+    Set Regroup = g
+End Function
+
+Private Function ContainsId(ByVal shp As Object, ByVal id As Long) As Boolean
+    Dim s As Object
+    If shp.Type <> MSO_GROUP Then Exit Function
+    For Each s In shp.GroupItems
+        If s.Id = id Or ContainsId(s, id) Then
+            ContainsId = True
+            Exit Function
+        End If
+    Next s
+End Function
+
+' A ShapeRange of these slide shapes. By index: names on a slide can repeat.
+Private Function ShapesById(ByVal sld As Object, ByVal items As Collection) As Object
+    Dim idx() As Variant, i As Long, n As Long, it As Object
+    ReDim idx(0 To items.Count - 1)
+    For i = 1 To sld.Shapes.Count
+        For Each it In items
+            If sld.Shapes(i).Id = it.Id Then
+                idx(n) = i
+                n = n + 1
+            End If
+        Next it
+    Next i
+    Set ShapesById = sld.Shapes.Range(idx)
+End Function
 
 Private Function AddPicture(ByVal sld As Object, ByVal path As String, ByVal l As Double, ByVal t As Double, ByVal w As Double, ByVal h As Double) As Object
     On Error Resume Next
@@ -268,16 +375,30 @@ End Function
 Private Function SelectedEquation(ByRef altText As String, ByRef iguanaSize As String) As Object
     Set SelectedEquation = Nothing
     altText = ""
-    On Error GoTo NoSelection
-    If ActiveWindow.Selection.Type <> SEL_SHAPES Then Exit Function
-    If ActiveWindow.Selection.ShapeRange.Count <> 1 Then Exit Function
-    Dim shp As Object
-    Set shp = ActiveWindow.Selection.ShapeRange(1)
-    altText = EquationText(shp, iguanaSize)
-    If altText <> "" Then Set SelectedEquation = shp
-    Exit Function
-NoSelection:
-    Set SelectedEquation = Nothing
+    Dim picked As Collection
+    Set picked = SelectedShapes()
+    If picked.Count <> 1 Then Exit Function
+    altText = EquationText(picked(1), iguanaSize)
+    If altText <> "" Then Set SelectedEquation = picked(1)
+End Function
+
+' The selected shapes; inside a group, the selected members. A piece of an
+' IguanaTeX vector display (tag EMFchild) stands for the whole display.
+Private Function SelectedShapes() As Collection
+    Dim picked As New Collection, sel As Object, candidates As Object, shp As Object, eq As Object
+    Set SelectedShapes = picked
+    On Error GoTo Done
+    Set sel = ActiveWindow.Selection
+    If sel.Type <> SEL_SHAPES And sel.Type <> SEL_TEXT Then Exit Function
+    If sel.HasChildShapeRange Then Set candidates = sel.ChildShapeRange Else Set candidates = sel.ShapeRange
+    For Each shp In candidates
+        Set eq = shp
+        If shp.Tags("EMFchild") <> "" Then Set eq = shp.ParentGroup
+        On Error Resume Next
+        picked.Add eq, CStr(eq.Id) ' keyed: several pieces of one display count once
+        On Error GoTo Done
+    Next shp
+Done:
 End Function
 
 ' The LavaTeX record text of a shape (tag or alt text). For an IguanaTeX

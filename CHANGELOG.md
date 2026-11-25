@@ -4,7 +4,8 @@
 
 ### PowerPoint
 
-- **IguanaTeX equations:** select one and click *Edit Equation* or *Regenerate*. LavaTeX opens its LaTeX and size, and replaces it with a LavaTeX equation in the same place.
+- **Works both ways with IguanaTeX.** Select an IguanaTeX equation and click *Edit Equation* or *Regenerate*: LavaTeX opens its LaTeX and replaces it at the same place and scale. LavaTeX equations also carry IguanaTeX's tags, so IguanaTeX's *Edit LaTeX display* opens them too.
+- Equations inside a group can be edited; they stay in the group.
 
 ## [0.2.0] - 2026-10-26
 
